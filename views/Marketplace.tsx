@@ -441,7 +441,7 @@ export const Marketplace: React.FC = () => {
       {/* ── Announcement Bar ── */}
       <div className="bg-[#151515] text-white text-center py-2 text-[11px] font-semibold tracking-wide">
         🎉 Use code <span className="font-black text-[#f04438]">GHANA20</span> for 20% off your first order &nbsp;|&nbsp;
-        <span className="inline-flex items-center gap-1"><Phone size={11} /> +233 244 123 456</span>
+        <span className="inline-flex items-center gap-1"><Phone size={11} /> +233 24 412 3456 &nbsp;|&nbsp; +233 54 285 5399</span>
       </div>
 
       {/* ── Header ── */}
