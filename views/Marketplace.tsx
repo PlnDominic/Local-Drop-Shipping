@@ -439,9 +439,15 @@ export const Marketplace: React.FC = () => {
     <main className="min-h-screen bg-[#f4f4f4] text-[#1c1c1c]">
 
       {/* ── Announcement Bar ── */}
-      <div className="bg-[#151515] text-white text-center py-2 text-[11px] font-semibold tracking-wide">
-        🎉 Use code <span className="font-black text-[#f04438]">GHANA20</span> for 20% off your first order &nbsp;|&nbsp;
-        <span className="inline-flex items-center gap-1"><Phone size={11} /> +233 55 660 9232 &nbsp;|&nbsp; +233 54 285 5399</span>
+      <div className="bg-[#151515] text-white py-2 text-[11px] font-semibold tracking-wide">
+        <div className="max-w-[1280px] mx-auto px-4 flex items-center justify-between gap-2 flex-wrap">
+          <span>🎉 Use code <span className="font-black text-[#f04438]">GHANA20</span> for 20% off your first order</span>
+          <span className="hidden sm:inline-flex items-center gap-3">
+            <span className="inline-flex items-center gap-1"><Phone size={11} /> +233 55 660 9232</span>
+            <span className="text-gray-500">|</span>
+            <span className="inline-flex items-center gap-1"><Phone size={11} /> +233 54 285 5399</span>
+          </span>
+        </div>
       </div>
 
       {/* ── Header ── */}
@@ -452,19 +458,21 @@ export const Marketplace: React.FC = () => {
           <a
             href="#"
             onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex-shrink-0 text-[17px] font-black text-[#151515] leading-tight"
+            className="flex-shrink-0 font-black text-[#151515] leading-tight text-[13px] sm:text-[17px]"
           >
-            Local Drop Shipping <span className="text-[#f04438]">GH</span>
+            <span className="hidden sm:inline">Local Drop Shipping </span>
+            <span className="sm:hidden">LDS </span>
+            <span className="text-[#f04438]">GH</span>
           </a>
 
           {/* Search bar */}
-          <div className="flex-1 max-w-xl mx-auto">
+          <div className="flex-1 min-w-0 max-w-xl mx-auto">
             <div className="flex h-10 border border-gray-200 rounded overflow-hidden">
               <select
                 aria-label="Category"
                 value={activeCategory}
                 onChange={(e) => setActiveCategory(e.target.value)}
-                className="border-r border-gray-200 bg-[#f7f7f7] px-3 text-[11px] font-semibold text-[#444] outline-none"
+                className="hidden sm:block border-r border-gray-200 bg-[#f7f7f7] px-3 text-[11px] font-semibold text-[#444] outline-none flex-shrink-0"
               >
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.label}</option>
@@ -475,13 +483,13 @@ export const Marketplace: React.FC = () => {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 aria-label="Search products"
-                placeholder="Search products, brands..."
-                className="flex-1 px-4 text-[12px] outline-none"
+                placeholder="Search products..."
+                className="flex-1 min-w-0 px-3 text-[12px] outline-none"
               />
               <button
                 type="button"
                 aria-label="Search"
-                className="bg-[#f04438] px-4 text-white hover:bg-[#c0392b] transition-colors"
+                className="flex-shrink-0 bg-[#f04438] px-3 sm:px-4 text-white hover:bg-[#c0392b] transition-colors"
               >
                 <Search size={16} />
               </button>
@@ -727,7 +735,7 @@ export const Marketplace: React.FC = () => {
             </div>
 
             {/* Features strip */}
-            <div className="grid grid-cols-4 gap-3 max-sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
                 { icon: Phone, title: 'Customer Support', sub: 'Mon–Sat 8am–8pm' },
                 { icon: CircleDollarSign, title: 'MoMo Payment', sub: 'Fast & secure' },
@@ -753,40 +761,40 @@ export const Marketplace: React.FC = () => {
 
         {/* ── Popular Products ── */}
         <section id="products" className="mt-6 bg-white rounded border border-gray-100 overflow-hidden">
-          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 gap-4 flex-wrap">
-            <h2 className="text-[16px] font-black text-[#151515]">Popular Products</h2>
+          <div className="border-b border-gray-100 px-4 py-4 space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-[15px] font-black text-[#151515]">Popular Products</h2>
+              <div className="flex h-9 items-center border border-gray-200 rounded overflow-hidden flex-1 max-w-[200px] sm:max-w-xs">
+                <Search size={13} className="ml-3 text-gray-400 flex-shrink-0" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Filter products..."
+                  className="flex-1 min-w-0 px-2 text-[11px] outline-none"
+                />
+              </div>
+            </div>
             <div className="flex items-center gap-1">
               {(['featured', 'bestseller', 'latest'] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`h-8 rounded px-4 text-[11px] font-black capitalize transition-colors ${activeTab === tab ? 'bg-[#f04438] text-white' : 'bg-gray-100 text-[#555] hover:bg-gray-200'}`}
+                  className={`h-8 rounded px-3 sm:px-4 text-[11px] font-black transition-colors ${activeTab === tab ? 'bg-[#f04438] text-white' : 'bg-gray-100 text-[#555] hover:bg-gray-200'}`}
                 >
                   {tab === 'featured' ? 'Featured' : tab === 'bestseller' ? 'Best Seller' : 'Latest'}
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2 ml-auto">
-              <div className="flex h-9 items-center border border-gray-200 rounded overflow-hidden w-52">
-                <Search size={14} className="ml-3 text-gray-400 flex-shrink-0" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Filter products..."
-                  className="flex-1 px-2 text-[11px] outline-none"
-                />
-              </div>
-            </div>
           </div>
 
           <div className="p-5">
             {isLoading ? (
-              <div className="grid grid-cols-4 gap-4 max-lg:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>
             ) : pagedProducts.length > 0 ? (
-              <div className="grid grid-cols-4 gap-4 max-lg:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {pagedProducts.map((product, index) => (
                   <ProductCard
                     key={`${product.id}-${index}`}
@@ -855,7 +863,7 @@ export const Marketplace: React.FC = () => {
         </section>
 
         {/* ── Sale Banners ── */}
-        <div className="mt-6 grid grid-cols-3 gap-4 max-md:grid-cols-1">
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {[
             { bg: '#151515', title: 'Flash Sale', sub: 'Up to 40% off electronics today', cta: 'Shop Electronics', cat: 'cat-1' },
             { bg: '#f04438', title: 'New Fashion', sub: 'Fresh styles from Accra designers', cta: 'Browse Fashion', cat: 'cat-2' },
@@ -887,14 +895,14 @@ export const Marketplace: React.FC = () => {
             <h2 className="text-[16px] font-black text-[#151515]">Our Categories</h2>
             <button type="button" className="text-[11px] font-semibold text-[#f04438] hover:underline">View all →</button>
           </div>
-          <div className="grid grid-cols-6 gap-3 max-md:grid-cols-3 max-sm:grid-cols-2">
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
             {[
-              { id: 'cat-1', label: 'Electronics', icon: Zap, color: '#3b82f6' },
-              { id: 'cat-2', label: 'Fashion', icon: Heart, color: '#ec4899' },
-              { id: 'cat-3', label: 'Beauty', icon: Star, color: '#f59e0b' },
-              { id: 'cat-4', label: 'Home', icon: Package, color: '#10b981' },
-              { id: 'cat-5', label: 'Health', icon: Gift, color: '#8b5cf6' },
-              { id: 'cat-6', label: 'Food', icon: Tag, color: '#f04438' }
+              { id: 'cat-1', label: 'Electronics', icon: Zap },
+              { id: 'cat-2', label: 'Fashion', icon: Heart },
+              { id: 'cat-3', label: 'Beauty', icon: Star },
+              { id: 'cat-4', label: 'Home', icon: Package },
+              { id: 'cat-5', label: 'Health', icon: Gift },
+              { id: 'cat-6', label: 'Food', icon: Tag }
             ].map((cat) => {
               const Icon = cat.icon;
               return (
@@ -902,13 +910,10 @@ export const Marketplace: React.FC = () => {
                   key={cat.id}
                   type="button"
                   onClick={() => { setActiveCategory(cat.id); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
-                  className="flex flex-col items-center gap-2 p-4 rounded border border-gray-100 hover:border-[#f04438] hover:shadow-sm transition-all group"
+                  className="flex flex-col items-center gap-2 p-3 sm:p-4 rounded border border-gray-100 hover:border-[#f04438] hover:shadow-sm transition-all group"
                 >
-                  <div
-                    className="h-10 w-10 rounded-full grid place-items-center"
-                    style={{ backgroundColor: `${cat.color}15` }}
-                  >
-                    <Icon size={20} style={{ color: cat.color }} />
+                  <div className="h-10 w-10 rounded-full grid place-items-center bg-[#f04438]/10">
+                    <Icon size={20} className="text-[#f04438]" />
                   </div>
                   <span className="text-[11px] font-bold text-[#444] group-hover:text-[#f04438] transition-colors">{cat.label}</span>
                 </button>
@@ -929,7 +934,7 @@ export const Marketplace: React.FC = () => {
               View all →
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-4 p-5 max-md:grid-cols-2 max-sm:grid-cols-1">
+          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 md:grid-cols-3">
             {topRated.map((product, i) => (
               <ProductCard
                 key={`rated-${product.id}-${i}`}
@@ -944,39 +949,41 @@ export const Marketplace: React.FC = () => {
         </section>
 
         {/* ── Newsletter CTA ── */}
-        <section className="mt-6 bg-gradient-to-r from-[#151515] to-[#2d2d2d] rounded p-8 text-white flex items-center justify-between gap-8 flex-wrap">
-          <div>
-            <h2 className="text-[24px] font-black mb-1">Stay in the Loop</h2>
-            <p className="text-gray-300 text-[13px]">Get the latest deals and new arrivals straight to your inbox.</p>
-          </div>
-          {emailSubmitted ? (
-            <div className="flex items-center gap-2 text-sm font-bold text-[#f04438]">
-              <CheckCircle2 size={18} />
-              Thanks! You&apos;re subscribed.
+        <section className="mt-6 bg-gradient-to-r from-[#151515] to-[#2d2d2d] rounded p-6 sm:p-8 text-white">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+            <div>
+              <h2 className="text-[20px] sm:text-[24px] font-black mb-1">Stay in the Loop</h2>
+              <p className="text-gray-300 text-[12px] sm:text-[13px]">Get the latest deals and new arrivals straight to your inbox.</p>
             </div>
-          ) : (
-            <form className="flex gap-2" onSubmit={handleEmailSubmit}>
-              <input
-                required
-                type="email"
-                aria-label="Your Email"
-                placeholder="Enter your email address"
-                className="h-11 rounded border border-white/20 bg-white/10 px-4 text-[12px] text-white placeholder:text-gray-400 outline-none focus:border-[#f04438] w-64"
-              />
-              <button
-                type="submit"
-                className="h-11 rounded bg-[#f04438] px-6 text-[11px] font-black text-white hover:bg-[#c0392b] transition-colors"
-              >
-                Subscribe
-              </button>
-            </form>
-          )}
+            {emailSubmitted ? (
+              <div className="flex items-center gap-2 text-sm font-bold text-[#f04438]">
+                <CheckCircle2 size={18} />
+                Thanks! You&apos;re subscribed.
+              </div>
+            ) : (
+              <form className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto" onSubmit={handleEmailSubmit}>
+                <input
+                  required
+                  type="email"
+                  aria-label="Your Email"
+                  placeholder="Enter your email address"
+                  className="h-11 rounded border border-white/20 bg-white/10 px-4 text-[12px] text-white placeholder:text-gray-400 outline-none focus:border-[#f04438] w-full sm:w-64"
+                />
+                <button
+                  type="submit"
+                  className="h-11 rounded bg-[#f04438] px-6 text-[11px] font-black text-white hover:bg-[#c0392b] transition-colors"
+                >
+                  Subscribe
+                </button>
+              </form>
+            )}
+          </div>
         </section>
       </div>
 
       {/* ── Footer ── */}
       <footer className="mt-8 bg-[#151515] text-white">
-        <div className="max-w-[1280px] mx-auto px-4 py-12 grid grid-cols-4 gap-8 max-lg:grid-cols-2 max-sm:grid-cols-1">
+        <div className="max-w-[1280px] mx-auto px-4 py-10 grid grid-cols-2 gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <h3 className="text-[16px] font-black mb-1">Local Drop Shipping <span className="text-[#f04438]">GH</span></h3>
             <p className="text-[12px] text-gray-400 leading-relaxed mt-2">
@@ -1033,7 +1040,7 @@ export const Marketplace: React.FC = () => {
         </div>
 
         <div className="border-t border-white/10">
-          <div className="max-w-[1280px] mx-auto px-4 py-4 flex items-center justify-between gap-4 flex-wrap text-[11px] text-gray-500">
+          <div className="max-w-[1280px] mx-auto px-4 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-gray-500">
             <span>© {new Date().getFullYear()} Local Drop Shipping GH. All Rights Reserved.</span>
             <div className="flex gap-6">
               <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-white transition-colors">Terms of Service</a>
