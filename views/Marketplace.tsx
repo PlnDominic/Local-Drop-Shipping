@@ -441,7 +441,7 @@ export const Marketplace: React.FC = () => {
       {/* ── Announcement Bar ── */}
       <div className="bg-[#151515] text-white text-center py-2 text-[11px] font-semibold tracking-wide">
         🎉 Use code <span className="font-black text-[#f04438]">GHANA20</span> for 20% off your first order &nbsp;|&nbsp;
-        <span className="inline-flex items-center gap-1"><Phone size={11} /> +233 24 412 3456 &nbsp;|&nbsp; +233 54 285 5399</span>
+        <span className="inline-flex items-center gap-1"><Phone size={11} /> +233 55 660 9232 &nbsp;|&nbsp; +233 54 285 5399</span>
       </div>
 
       {/* ── Header ── */}
@@ -1033,11 +1033,22 @@ export const Marketplace: React.FC = () => {
 
         <div className="border-t border-white/10">
           <div className="max-w-[1280px] mx-auto px-4 py-4 flex items-center justify-between gap-4 flex-wrap text-[11px] text-gray-500">
-            <span>Copyright {new Date().getFullYear()} Local Drop Shipping GH. All Rights Reserved.</span>
+            <span>© {new Date().getFullYear()} Local Drop Shipping GH. All Rights Reserved.</span>
             <div className="flex gap-6">
               <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-white transition-colors">Terms of Service</a>
               <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-white transition-colors">Privacy Policy</a>
             </div>
+            <span>
+              Developed by{' '}
+              <a
+                href="https://www.ecstasytechnologies.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#f04438] hover:underline font-semibold"
+              >
+                Ecstasy Technologies
+              </a>
+            </span>
           </div>
         </div>
       </footer>
