@@ -1,194 +1,213 @@
-﻿import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
 import type { UserRole } from '../store/globalStore';
-import type { LucideIcon } from 'lucide-react';
-import { 
-  Users, 
-  ShoppingBag, 
-  TrendingUp, 
-  Truck, 
-  ShieldAlert, 
-  Code, 
-  Smartphone, 
-  Monitor, 
-  Bell, 
-  Wallet
+import {
+  ShoppingBag,
+  TrendingUp,
+  Truck,
+  ShieldAlert,
+  Code,
+  Bell,
+  Wallet,
+  Menu,
+  X,
+  ChevronDown
 } from 'lucide-react';
 
-export const Navigation: React.FC = () => {
-  const { activeRole, setActiveRole, mobilePreview, setMobilePreview, cart, wallets, notifications } = useGlobalStore();
+interface NavigationProps {
+  activePage: string;
+  setActivePage: (page: string) => void;
+}
 
-  const roles: { role: UserRole; label: string; icon: LucideIcon; color: string; desc: string }[] = [
-    { 
-      role: 'customer', 
-      label: 'Customer Marketplace', 
-      icon: ShoppingBag, 
-      color: 'bg-blue-500', 
-      desc: 'Browse, buy products via MoMo' 
-    },
-    { 
-      role: 'dropshipper', 
-      label: 'Dropshipper SaaS', 
-      icon: TrendingUp, 
-      color: 'bg-emerald-500', 
-      desc: 'Import products, set markups, earn commissions' 
-    },
-    { 
-      role: 'supplier', 
-      label: 'Supplier Portal', 
-      icon: Truck, 
-      color: 'bg-purple-500', 
-      desc: 'List wholesale items, fulfill shipments' 
-    },
-    { 
-      role: 'admin', 
-      label: 'Admin Control', 
-      icon: ShieldAlert, 
-      color: 'bg-red-500', 
-      desc: 'Verify suppliers, platform analytics' 
-    },
-    { 
-      role: 'developer', 
-      label: 'System Docs & ERD', 
-      icon: Code, 
-      color: 'bg-gray-700', 
-      desc: 'API docs, Database ERD, Architecture' 
-    }
-  ];
-
-  const getRoleLabel = (r: UserRole) => {
-    switch (r) {
-      case 'customer': return 'AMA (Customer)';
-      case 'dropshipper': return 'KOFI (Dropshipper)';
-      case 'supplier': return 'KANTANKA (Supplier)';
-      case 'admin': return 'YAW (Platform Admin)';
-      case 'developer': return 'System Architect';
-    }
-  };
-
-  const getWalletDisplay = () => {
-    if (activeRole === 'dropshipper') {
-      return `GHS ${wallets['u-dropshipper-1']?.balance.toFixed(2)}`;
-    }
-    if (activeRole === 'supplier') {
-      return `GHS ${wallets['u-supplier-1']?.balance.toFixed(2)}`;
-    }
-    if (activeRole === 'admin') {
-      return `GHS ${wallets['u-admin-1']?.balance.toFixed(2)}`;
-    }
-    return null;
-  };
+export const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) => {
+  const { activeRole, setActiveRole, cart, wallets, notifications } = useGlobalStore();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [portalDropdownOpen, setPortalDropdownOpen] = useState(false);
 
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
+  const getWalletBalance = () => {
+    if (activeRole === 'dropshipper') return wallets['u-dropshipper-1']?.balance.toFixed(2);
+    if (activeRole === 'supplier') return wallets['u-supplier-1']?.balance.toFixed(2);
+    if (activeRole === 'admin') return wallets['u-admin-1']?.balance.toFixed(2);
+    return null;
+  };
+
+  const navLinks = [
+    { id: 'home', label: 'Home' },
+    { id: 'marketplace', label: 'Marketplace' },
+    { id: 'dropshipper', label: 'Start Dropshipping' },
+    { id: 'supplier', label: 'Supplier Portal' },
+  ];
+
+  const portalLinks: { id: UserRole; label: string; icon: React.ElementType; desc: string }[] = [
+    { id: 'customer', label: 'Customer View', icon: ShoppingBag, desc: 'Browse & buy products' },
+    { id: 'dropshipper', label: 'Dropshipper Dashboard', icon: TrendingUp, desc: 'Manage your store' },
+    { id: 'supplier', label: 'Supplier Dashboard', icon: Truck, desc: 'List & fulfill orders' },
+    { id: 'admin', label: 'Admin Panel', icon: ShieldAlert, desc: 'Platform analytics' },
+    { id: 'developer', label: 'API Docs & ERD', icon: Code, desc: 'System architecture' },
+  ];
+
+  const handleNavClick = (id: string) => {
+    setActivePage(id);
+    setMobileMenuOpen(false);
+    if (id === 'marketplace') setActiveRole('customer');
+    if (id === 'dropshipper') setActiveRole('dropshipper');
+    if (id === 'supplier') setActiveRole('supplier');
+  };
+
+  const handlePortalClick = (role: UserRole) => {
+    setActiveRole(role);
+    setActivePage(role === 'customer' ? 'marketplace' : role);
+    setPortalDropdownOpen(false);
+    setMobileMenuOpen(false);
+  };
+
+  const walletBalance = getWalletBalance();
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md">
-      {/* Simulation Banner */}
-      <div className="bg-neutral-dark text-white text-xs px-4 py-2 flex flex-col md:flex-row items-center justify-between gap-2 border-b border-gray-800">
-        <div className="flex items-center gap-2">
-          <span className="bg-accent text-neutral-dark font-extrabold px-1.5 py-0.5 text-[10px] tracking-wider animate-pulse-border">
-            SIMULATOR MODE
-          </span>
-          <span className="text-gray-300 font-medium">
-            Click roles below to test the cross-platform dropshipping loops in real time.
-          </span>
-        </div>
-        
-        {/* Device Mode Selector */}
-        <div className="flex items-center gap-4">
-          <div className="flex bg-gray-800 p-0.5 border border-gray-700">
-            <button 
-              onClick={() => setMobilePreview(false)}
-              className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${!mobilePreview ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}
-              title="Desktop Web Layout"
-            >
-              <Monitor size={12} />
-              <span>Desktop</span>
-            </button>
-            <button 
-              onClick={() => setMobilePreview(true)}
-              className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${mobilePreview ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}
-              title="Mobile App Viewport"
-            >
-              <Smartphone size={12} />
-              <span>Mobile App</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Role Selector Tabs */}
-      <div className="bg-gray-50 border-b border-gray-200 overflow-x-auto scrollbar-none py-1">
-        <div className="max-w-7xl mx-auto px-4 flex gap-1">
-          {roles.map((r) => {
-            const Icon = r.icon;
-            const isActive = activeRole === r.role;
-            return (
-              <button
-                key={r.role}
-                onClick={() => setActiveRole(r.role)}
-                className={`flex items-center gap-2 px-3 py-2 transition-all text-xs font-semibold whitespace-nowrap ${
-                  isActive 
-                    ? 'bg-primary text-white shadow-sm' 
-                    : 'text-neutral-gray hover:bg-gray-100 hover:text-neutral-dark'
-                }`}
-                title={r.desc}
-              >
-                <Icon size={14} className={isActive ? 'text-accent' : 'text-gray-400'} />
-                <span>{r.label}</span>
-                {r.role === 'customer' && cartCount > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.2 animate-bounce">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Main Branding Header */}
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary flex items-center justify-center text-accent font-black text-lg shadow-md">
+    <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-sm">
+      {/* Top bar */}
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        {/* Logo */}
+        <button
+          onClick={() => handleNavClick('home')}
+          className="flex items-center gap-2.5 shrink-0"
+        >
+          <div className="w-9 h-9 bg-primary flex items-center justify-center text-accent font-black text-base shadow-md">
             LD
           </div>
-          <div>
+          <div className="leading-none">
             <span className="font-extrabold text-lg text-primary tracking-tight">Local Drop Shipping</span>
-            <span className="text-accent font-bold text-lg"> GH</span>
-            <span className="hidden sm:inline text-xs text-neutral-gray ml-2 px-2 py-0.5 bg-gray-100 border border-gray-200">
-              Ghana Hub
-            </span>
+            <span className="text-accent font-black text-lg"> GH</span>
           </div>
-        </div>
+        </button>
 
-        {/* Status Indicators */}
-        <div className="flex items-center gap-4 text-sm font-medium">
-          <div className="hidden md:flex items-center gap-1 text-gray-500">
-            <Users size={16} />
-            <span>Active Session:</span>
-            <span className="text-neutral-dark font-bold bg-neutral-light px-2 py-0.5 border border-gray-200">
-              {getRoleLabel(activeRole)}
-            </span>
+        {/* Desktop nav links */}
+        <nav className="hidden md:flex items-center gap-1">
+          {navLinks.map((link) => (
+            <button
+              key={link.id}
+              onClick={() => handleNavClick(link.id)}
+              className={`px-4 py-2 text-sm font-semibold transition-colors ${
+                activePage === link.id
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-neutral-gray hover:text-neutral-dark'
+              }`}
+            >
+              {link.label}
+            </button>
+          ))}
+
+          {/* Portal dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setPortalDropdownOpen(!portalDropdownOpen)}
+              className={`flex items-center gap-1 px-4 py-2 text-sm font-semibold transition-colors ${
+                ['admin', 'developer'].includes(activePage)
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-neutral-gray hover:text-neutral-dark'
+              }`}
+            >
+              Portals <ChevronDown size={14} />
+            </button>
+            {portalDropdownOpen && (
+              <div className="absolute top-full right-0 mt-1 w-56 bg-white border border-gray-200 shadow-lg z-50">
+                {portalLinks.map((p) => {
+                  const Icon = p.icon;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => handlePortalClick(p.id)}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <Icon size={16} className="text-primary shrink-0" />
+                      <div>
+                        <div className="text-sm font-semibold text-neutral-dark">{p.label}</div>
+                        <div className="text-xs text-neutral-gray">{p.desc}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
+        </nav>
 
-          {getWalletDisplay() && (
-            <div className="flex items-center gap-1.5 bg-primary-light text-primary font-bold px-3 py-1.5 border border-primary/10">
-              <Wallet size={15} />
-              <span>{getWalletDisplay()}</span>
+        {/* Right side actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          {walletBalance && (
+            <div className="hidden sm:flex items-center gap-1.5 bg-primary-light text-primary font-bold px-3 py-1.5 border border-primary/10 text-sm">
+              <Wallet size={14} />
+              <span>GHS {walletBalance}</span>
             </div>
           )}
 
+          <button
+            onClick={() => handleNavClick('marketplace')}
+            className="relative p-2 text-neutral-gray hover:text-neutral-dark transition-colors"
+          >
+            <ShoppingBag size={20} />
+            {cartCount > 0 && (
+              <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-black flex items-center justify-center">
+                {cartCount}
+              </span>
+            )}
+          </button>
+
           <div className="relative">
-            <button className="p-2 hover:bg-gray-100 text-neutral-gray hover:text-neutral-dark transition-colors relative">
+            <button className="p-2 text-neutral-gray hover:text-neutral-dark transition-colors">
               <Bell size={20} />
               {notifications.length > 0 && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 border-2 border-white"></span>
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 border-2 border-white"></span>
               )}
             </button>
           </div>
+
+          {/* Mobile menu toggle */}
+          <button
+            className="md:hidden p-2 text-neutral-gray hover:text-neutral-dark transition-colors"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-white border-t border-gray-100 px-4 py-3 flex flex-col gap-1">
+          {navLinks.map((link) => (
+            <button
+              key={link.id}
+              onClick={() => handleNavClick(link.id)}
+              className={`w-full text-left px-3 py-2.5 text-sm font-semibold rounded transition-colors ${
+                activePage === link.id ? 'bg-primary text-white' : 'text-neutral-gray hover:bg-gray-50'
+              }`}
+            >
+              {link.label}
+            </button>
+          ))}
+          <div className="border-t border-gray-100 mt-2 pt-2">
+            <p className="text-xs font-bold text-neutral-gray px-3 pb-1 uppercase tracking-wider">Portals</p>
+            {portalLinks.map((p) => {
+              const Icon = p.icon;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => handlePortalClick(p.id)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <Icon size={15} className="text-primary shrink-0" />
+                  <span className="text-sm font-semibold text-neutral-dark">{p.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </header>
   );
 };
