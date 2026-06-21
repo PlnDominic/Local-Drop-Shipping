@@ -15,9 +15,9 @@ module.exports = {
           light: '#e6f3ec',
         },
         accent: {
-          DEFAULT: '#FCD116', // Gold
-          dark: '#d6b00c',
-          light: '#fffde6',
+          DEFAULT: '#f04438', // Red
+          dark: '#c0392b',
+          light: '#fef2f2',
         },
         success: {
           DEFAULT: '#10B981', // Emerald
