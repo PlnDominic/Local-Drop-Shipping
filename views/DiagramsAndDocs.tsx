@@ -448,7 +448,7 @@ export const DiagramsAndDocs: React.FC = () => {
                     {apiRoutes[selectedRoute].method}
                   </span>
                   <span className="font-mono text-sm font-bold text-neutral-dark">
-                    https://api.localdropshipping.gh.com/v1{apiRoutes[selectedRoute].path}
+                    https://api.localdropshippinggh.com/v1{apiRoutes[selectedRoute].path}
                   </span>
                 </div>
                 <p className="text-xs text-neutral-gray">{apiRoutes[selectedRoute].desc}</p>

@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'LocalDropshipping.gh.com - Sell More. Stock Less. Grow Faster.',
-  description: 'A local dropshipping storefront and operations simulator.'
+  title: 'Local Drop Shipping GH - Sell More. Stock Less. Grow Faster.',
+  description: 'Local Drop Shipping GH — Ghana\'s local dropshipping storefront and operations platform.'
 };
 
 export default function RootLayout({

@@ -244,7 +244,7 @@ export const DropshipperDashboard: React.FC = () => {
                 </h5>
                 <p className="text-[11px] leading-relaxed">
                   Name: <strong>Kofi's Express Deals</strong><br />
-                  Domain: <span className="underline hover:text-primary cursor-pointer font-semibold">localdropshipping.gh.com/store/kofiexpress</span><br />
+                  Domain: <span className="underline hover:text-primary cursor-pointer font-semibold">localdropshippinggh.com/store/kofiexpress</span><br />
                   Imported inventory count: <strong>{dropshipperProducts.length} items published</strong>.
                 </p>
               </div>

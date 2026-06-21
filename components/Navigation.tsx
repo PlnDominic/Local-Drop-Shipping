@@ -154,8 +154,8 @@ export const Navigation: React.FC = () => {
             LD
           </div>
           <div>
-            <span className="font-extrabold text-lg text-primary tracking-tight">LocalDropshipping</span>
-            <span className="text-accent font-bold text-lg">.gh</span>
+            <span className="font-extrabold text-lg text-primary tracking-tight">Local Drop Shipping</span>
+            <span className="text-accent font-bold text-lg"> GH</span>
             <span className="hidden sm:inline text-xs text-neutral-gray ml-2 px-2 py-0.5 bg-gray-100 border border-gray-200">
               Ghana Hub
             </span>
