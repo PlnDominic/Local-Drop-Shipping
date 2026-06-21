@@ -9,7 +9,7 @@ module.exports = [
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  reactHooks.configs.flat.recommended,
+  reactHooks.configs['recommended-latest'],
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {

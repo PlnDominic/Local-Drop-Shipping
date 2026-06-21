@@ -8,20 +8,22 @@ import {
   ChevronDown,
   CircleDollarSign,
   CreditCard,
-  Folder,
-  Home,
+  Gift,
+  Heart,
+  LayoutGrid,
+  MapPin,
   Minus,
-  Music,
+  Package,
   Phone,
   Plus,
   Search,
   ShoppingCart,
-  SlidersHorizontal,
-  Sparkles,
   Star,
   Tag,
+  Truck,
   User,
-  X
+  X,
+  Zap
 } from 'lucide-react';
 import { useGlobalStore } from '../store/globalStore';
 import type { DropshipperProduct, ProductReview } from '../store/globalStore';
@@ -29,8 +31,12 @@ import { useToast } from '../components/Toast';
 
 const heroImage =
   'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=90';
+const heroBanner2 =
+  'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=600&q=80';
+const heroBanner3 =
+  'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80';
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 8;
 
 const formatMoney = (amount: number) =>
   `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
@@ -52,38 +58,32 @@ const computeAvgRating = (reviews: ProductReview[]): number => {
   return reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
 };
 
-const StarDisplay: React.FC<{ rating: number; size?: number }> = ({ rating, size = 13 }) => {
-  return (
-    <span className="inline-flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <Star
-          key={n}
-          size={size}
-          fill={n <= Math.round(rating) ? '#f5a524' : 'none'}
-          stroke={n <= Math.round(rating) ? '#f5a524' : '#ccc'}
-          strokeWidth={1.5}
-        />
-      ))}
-    </span>
-  );
-};
+const StarDisplay: React.FC<{ rating: number; size?: number }> = ({ rating, size = 13 }) => (
+  <span className="inline-flex items-center gap-0.5">
+    {[1, 2, 3, 4, 5].map((n) => (
+      <Star
+        key={n}
+        size={size}
+        fill={n <= Math.round(rating) ? '#f5a524' : 'none'}
+        stroke={n <= Math.round(rating) ? '#f5a524' : '#ccc'}
+        strokeWidth={1.5}
+      />
+    ))}
+  </span>
+);
 
-// ── Skeleton loader ──
 const SkeletonCard: React.FC = () => (
-  <div className="min-w-0 animate-pulse">
-    <div className="aspect-[1/0.92] bg-gray-200" />
+  <div className="min-w-0 animate-pulse rounded border border-gray-100 bg-white p-3">
+    <div className="aspect-square bg-gray-200 rounded" />
     <div className="pt-3 space-y-2">
-      <div className="h-5 bg-gray-200 rounded w-3/4" />
-      <div className="h-4 bg-gray-200 rounded w-1/2" />
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="h-9 bg-gray-200 rounded" />
-        <div className="h-9 bg-gray-200 rounded" />
-      </div>
+      <div className="h-4 bg-gray-200 rounded w-3/4" />
+      <div className="h-3 bg-gray-200 rounded w-1/2" />
+      <div className="h-3 bg-gray-200 rounded w-1/3" />
+      <div className="mt-3 h-9 bg-gray-200 rounded" />
     </div>
   </div>
 );
 
-// ── Product Detail Modal ──
 const ProductModal: React.FC<{
   product: DropshipperProduct;
   onClose: () => void;
@@ -100,63 +100,56 @@ const ProductModal: React.FC<{
       aria-modal="true"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="relative w-full max-w-2xl bg-white shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white shadow-2xl rounded-lg max-h-[90vh] overflow-y-auto">
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center border border-gray-200 bg-white hover:bg-gray-50"
+          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-white hover:bg-gray-50"
         >
           <X size={18} />
         </button>
 
         <div className="grid md:grid-cols-2">
-          {/* Image */}
-          <div className="bg-[#f2f2f2] aspect-square flex items-center justify-center p-8">
+          <div className="bg-[#f7f7f7] aspect-square flex items-center justify-center p-8 rounded-tl-lg rounded-bl-lg">
             <img
               src={product.product.images[0]}
               alt={product.product.name}
               className="h-full w-full object-contain mix-blend-multiply"
             />
           </div>
-
-          {/* Info */}
           <div className="p-6 flex flex-col gap-4">
             <div>
-              <span className="text-[10px] font-black text-[#777] uppercase tracking-wider">
+              <span className="inline-block bg-[#f04438]/10 text-[#f04438] text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded mb-2">
                 {getCategoryLabel(product.product.categoryId)}
               </span>
-              <h2 className="mt-1 text-[20px] font-black leading-tight text-[#151515]">
+              <h2 className="text-[20px] font-black leading-tight text-[#151515]">
                 {product.product.name}
               </h2>
               <p className="mt-1 text-xs text-[#777]">By {product.product.supplierName}</p>
             </div>
-
             <p className="text-sm leading-relaxed text-[#444]">{product.customDescription}</p>
-
             <div className="flex items-center gap-3">
               <StarDisplay rating={avgRating} size={16} />
               <span className="text-xs font-bold text-[#777]">
                 {avgRating.toFixed(1)} ({reviews.length} review{reviews.length !== 1 ? 's' : ''})
               </span>
             </div>
-
             <div className="flex items-center justify-between">
-              <strong className="text-2xl font-black text-[#151515]">{formatMoney(product.sellingPrice)}</strong>
+              <strong className="text-2xl font-black text-[#f04438]">{formatMoney(product.sellingPrice)}</strong>
               <span className="text-xs text-[#777]">{product.product.stockQty} in stock</span>
             </div>
-
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => { onAddToCart(product.id); onClose(); }}
-                className="h-10 border border-[#dedede] bg-white px-3 text-[11px] font-black text-[#151515] transition-colors hover:border-[#191919]"
+                className="h-11 rounded border border-[#151515] bg-white px-3 text-[11px] font-black text-[#151515] transition-colors hover:bg-gray-50"
               >
                 Add to Cart
               </button>
               <button
                 type="button"
                 onClick={() => { onBuyNow(product.id); onClose(); }}
-                className="h-10 border border-[#191919] bg-[#191919] px-3 text-[11px] font-black text-white transition-colors hover:bg-black"
+                className="h-11 rounded border border-[#f04438] bg-[#f04438] px-3 text-[11px] font-black text-white transition-colors hover:bg-[#c0392b]"
               >
                 Buy Now
               </button>
@@ -164,7 +157,6 @@ const ProductModal: React.FC<{
           </div>
         </div>
 
-        {/* Reviews section */}
         {reviews.length > 0 && (
           <div className="border-t border-[#ededed] p-6">
             <h3 className="mb-4 text-[15px] font-black text-[#151515]">Customer Reviews</h3>
@@ -191,61 +183,92 @@ const ProductModal: React.FC<{
 
 const ProductCard: React.FC<{
   product: DropshipperProduct;
-  compact?: boolean;
   onAddToCart: (id: string) => void;
   onBuyNow: (id: string) => void;
   onOpenDetail: (product: DropshipperProduct) => void;
-}> = ({ product, compact = false, onAddToCart, onBuyNow, onOpenDetail }) => {
+  horizontal?: boolean;
+}> = ({ product, onAddToCart, onBuyNow: _onBuyNow, onOpenDetail, horizontal = false }) => {
   const reviews = product.product.reviews || [];
   const avgRating = computeAvgRating(reviews);
+  const discount = product.product.suggestedPrice > product.sellingPrice
+    ? Math.round(((product.product.suggestedPrice - product.sellingPrice) / product.product.suggestedPrice) * 100)
+    : 0;
+
+  if (horizontal) {
+    return (
+      <article className="flex gap-3 p-3 border border-gray-100 rounded bg-white hover:shadow-sm transition-shadow">
+        <div
+          className="w-16 h-16 flex-shrink-0 bg-[#f7f7f7] rounded cursor-pointer flex items-center justify-center"
+          onClick={() => onOpenDetail(product)}
+        >
+          <img src={product.product.images[0]} alt={product.product.name} className="w-full h-full object-contain p-1 mix-blend-multiply" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h4
+            className="line-clamp-2 text-xs font-bold text-[#151515] cursor-pointer hover:text-[#f04438] leading-tight"
+            onClick={() => onOpenDetail(product)}
+          >
+            {product.product.name}
+          </h4>
+          <StarDisplay rating={avgRating} size={10} />
+          <p className="mt-1 text-sm font-black text-[#f04438]">{formatMoney(product.sellingPrice)}</p>
+        </div>
+      </article>
+    );
+  }
 
   return (
-    <article className="min-w-0">
+    <article className="group min-w-0 bg-white border border-gray-100 rounded hover:shadow-md transition-shadow">
       <div
-        className={`relative overflow-hidden bg-[#f2f2f2] ${compact ? 'aspect-[1.55/1]' : 'aspect-[1/0.92]'} cursor-pointer`}
+        className="relative overflow-hidden bg-[#f7f7f7] aspect-square cursor-pointer rounded-t"
         onClick={() => onOpenDetail(product)}
       >
-        <span className="absolute right-2.5 top-2.5 z-10 grid min-w-[58px] place-items-center border border-[#d8d8d8] bg-white/95 px-3 py-1 text-[11px] font-black text-[#222] shadow-sm">
-          {getCategoryLabel(product.product.categoryId)}
-        </span>
+        {discount > 0 && (
+          <span className="absolute left-2 top-2 z-10 bg-[#f04438] px-2 py-0.5 text-[10px] font-black text-white rounded">
+            -{discount}%
+          </span>
+        )}
+        <button
+          type="button"
+          aria-label="Wishlist"
+          onClick={(e) => { e.stopPropagation(); }}
+          className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-white shadow opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Heart size={13} className="text-gray-400 hover:text-[#f04438]" />
+        </button>
         <img
           src={product.product.images[0]}
           alt={product.product.name}
-          className="h-full w-full object-contain p-6 mix-blend-multiply transition-transform duration-500 hover:scale-105"
+          className="h-full w-full object-contain p-4 mix-blend-multiply transition-transform duration-500 group-hover:scale-105"
         />
       </div>
-      <div className="pt-3">
+      <div className="p-3">
+        <span className="text-[9px] font-bold text-[#777] uppercase tracking-wider">
+          {getCategoryLabel(product.product.categoryId)}
+        </span>
         <h3
-          className="line-clamp-1 text-[19px] font-black leading-tight tracking-normal text-[#151515] cursor-pointer hover:underline"
+          className="mt-0.5 line-clamp-2 text-[13px] font-bold leading-tight text-[#151515] cursor-pointer hover:text-[#f04438] transition-colors"
           onClick={() => onOpenDetail(product)}
         >
           {product.product.name}
         </h3>
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-[#777]">
-            <StarDisplay rating={avgRating} />
-            {avgRating.toFixed(1)} ({reviews.length})
-          </span>
-          <strong className="whitespace-nowrap text-[18px] font-black text-[#151515]">
-            {formatMoney(product.sellingPrice)}
-          </strong>
+        <div className="mt-1 flex items-center gap-1">
+          <StarDisplay rating={avgRating} size={10} />
+          <span className="text-[10px] text-[#999]">({reviews.length})</span>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => onAddToCart(product.id)}
-            className="h-9 border border-[#dedede] bg-white px-3 text-[11px] font-black text-[#151515] transition-colors hover:border-[#191919]"
-          >
-            Add to Cart
-          </button>
-          <button
-            type="button"
-            onClick={() => onBuyNow(product.id)}
-            className="h-9 border border-[#191919] bg-[#191919] px-3 text-[11px] font-black text-white transition-colors hover:bg-black"
-          >
-            Buy Now
-          </button>
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-[15px] font-black text-[#f04438]">{formatMoney(product.sellingPrice)}</span>
+          {discount > 0 && (
+            <span className="text-[11px] text-[#bbb] line-through">{formatMoney(product.product.suggestedPrice)}</span>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={() => onAddToCart(product.id)}
+          className="mt-3 w-full h-9 rounded bg-[#151515] text-[11px] font-black text-white transition-colors hover:bg-[#f04438]"
+        >
+          Add to Cart
+        </button>
       </div>
     </article>
   );
@@ -268,41 +291,37 @@ export const Marketplace: React.FC = () => {
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [sortMode, setSortMode] = useState<'default' | 'new' | 'bestseller' | 'discount'>('default');
+  const [activeTab, setActiveTab] = useState<'featured' | 'bestseller' | 'latest'>('featured');
   const [currentPage, setCurrentPage] = useState(1);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [detailProduct, setDetailProduct] = useState<DropshipperProduct | null>(null);
-
-  // Promo code state
   const [promoInput, setPromoInput] = useState('');
   const [promoError, setPromoError] = useState('');
 
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const recsRef = useRef<HTMLDivElement>(null);
 
-  // 1-second skeleton on mount
   useEffect(() => {
     const t = setTimeout(() => setIsLoading(false), 1000);
     return () => clearTimeout(t);
   }, []);
 
-  // Reset to page 1 whenever filters change
-  useEffect(() => { setCurrentPage(1); }, [activeCategory, sortMode, query]);
+  useEffect(() => { setCurrentPage(1); }, [activeCategory, activeTab, query]);
 
   const publishedProducts = useMemo(
     () => dropshipperProducts.filter((item) => item.isPublished),
     [dropshipperProducts]
   );
+
   const catalogProducts = useMemo(
     () => [...publishedProducts, ...publishedProducts.slice().reverse(), ...publishedProducts.slice(0, 1)],
     [publishedProducts]
   );
-  const recommendations = useMemo(() => [...publishedProducts].reverse(), [publishedProducts]);
 
   const filteredProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -316,18 +335,14 @@ export const Marketplace: React.FC = () => {
       return matchesCategory && matchesSearch;
     });
 
-    if (sortMode === 'bestseller') {
+    if (activeTab === 'bestseller') {
       result = [...result].sort((a, b) => b.sellingPrice - a.sellingPrice);
-    } else if (sortMode === 'discount') {
-      result = [...result].sort(
-        (a, b) =>
-          (b.product.suggestedPrice - b.sellingPrice) -
-          (a.product.suggestedPrice - a.sellingPrice)
-      );
+    } else if (activeTab === 'latest') {
+      result = [...result].reverse();
     }
 
     return result;
-  }, [activeCategory, catalogProducts, query, sortMode]);
+  }, [activeCategory, catalogProducts, query, activeTab]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
   const pagedProducts = filteredProducts.slice(
@@ -342,6 +357,13 @@ export const Marketplace: React.FC = () => {
       return [1, 2, '...', totalPages - 2, totalPages - 1, totalPages];
     return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
   }, [totalPages, currentPage]);
+
+  const topRated = useMemo(
+    () => [...catalogProducts]
+      .sort((a, b) => computeAvgRating(b.product.reviews || []) - computeAvgRating(a.product.reviews || []))
+      .slice(0, 6),
+    [catalogProducts]
+  );
 
   const cartLines = cart
     .map((line) => {
@@ -397,84 +419,98 @@ export const Marketplace: React.FC = () => {
     }
   };
 
-  const focusSearch = () => {
-    document.getElementById('shop')?.scrollIntoView({ behavior: 'smooth' });
-    setTimeout(() => searchInputRef.current?.focus(), 400);
-  };
-
-  const scrollRecs = (dir: 'left' | 'right') => {
-    recsRef.current?.scrollBy({ left: dir === 'right' ? 360 : -360, behavior: 'smooth' });
-  };
-
-  const handleSortToggle = (mode: 'new' | 'bestseller' | 'discount') => {
-    setSortMode((prev) => (prev === mode ? 'default' : mode));
-  };
-
   const handleEmailSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setEmailSubmitted(true);
     setTimeout(() => setEmailSubmitted(false), 3000);
   };
 
-  const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const categories = [
+    { id: 'all', label: 'All Categories', icon: LayoutGrid },
+    { id: 'cat-1', label: 'Electronics', icon: Zap },
+    { id: 'cat-2', label: 'Fashion', icon: Heart },
+    { id: 'cat-3', label: 'Beauty', icon: Star },
+    { id: 'cat-4', label: 'Home & Living', icon: Package },
+    { id: 'cat-5', label: 'Health', icon: Gift },
+    { id: 'cat-6', label: 'Food & Grocery', icon: Tag },
+  ];
 
   return (
-    <main className="min-h-screen bg-white text-[#1c1c1c]">
-      <section className="w-full overflow-hidden bg-white">
+    <main className="min-h-screen bg-[#f4f4f4] text-[#1c1c1c]">
 
-        {/* ── Navbar ── */}
-        <header className="relative z-20 grid h-[74px] w-full grid-cols-[1fr_auto_1fr] items-center bg-white px-10 max-sm:grid-cols-[1fr_auto] max-sm:px-4">
+      {/* ── Announcement Bar ── */}
+      <div className="bg-[#151515] text-white text-center py-2 text-[11px] font-semibold tracking-wide">
+        🎉 Use code <span className="font-black text-[#f04438]">GHANA20</span> for 20% off your first order &nbsp;|&nbsp;
+        <span className="inline-flex items-center gap-1"><Phone size={11} /> +233 244 123 456</span>
+      </div>
+
+      {/* ── Header ── */}
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-[1280px] mx-auto px-4 h-16 flex items-center gap-4">
+
+          {/* Logo */}
           <a
             href="#"
             onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="inline-flex items-center gap-2 text-[17px] font-black text-[#151515]"
+            className="flex-shrink-0 text-[17px] font-black text-[#151515] leading-tight"
           >
-            <span className="text-primary">Local Drop Shipping <span className="text-accent">GH</span></span>
+            Local Drop Shipping <span className="text-[#f04438]">GH</span>
           </a>
 
-          <nav className="flex items-center gap-8 text-xs font-black max-sm:hidden">
-            <a href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-primary transition-colors">Marketplace</a>
-            <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary transition-colors">Start Dropshipping</a>
-            <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary transition-colors">Supplier Portal</a>
-            <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary transition-colors">Admin Panel</a>
-            <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary transition-colors">API Docs & ERD</a>
-          </nav>
+          {/* Search bar */}
+          <div className="flex-1 max-w-xl mx-auto">
+            <div className="flex h-10 border border-gray-200 rounded overflow-hidden">
+              <select
+                aria-label="Category"
+                value={activeCategory}
+                onChange={(e) => setActiveCategory(e.target.value)}
+                className="border-r border-gray-200 bg-[#f7f7f7] px-3 text-[11px] font-semibold text-[#444] outline-none"
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+              </select>
+              <input
+                ref={searchInputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label="Search products"
+                placeholder="Search products, brands..."
+                className="flex-1 px-4 text-[12px] outline-none"
+              />
+              <button
+                type="button"
+                aria-label="Search"
+                className="bg-[#f04438] px-4 text-white hover:bg-[#c0392b] transition-colors"
+              >
+                <Search size={16} />
+              </button>
+            </div>
+          </div>
 
-          <div className="flex items-center justify-end gap-3">
+          {/* Icons */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
-              aria-label="Search"
-              onClick={focusSearch}
-              className="grid h-10 w-10 place-items-center border border-[#ededed] transition-colors hover:bg-[#f5f5f5]"
+              aria-label="Wishlist"
+              className="hidden sm:flex flex-col items-center gap-0.5 p-2 text-[#555] hover:text-[#f04438] transition-colors"
             >
-              <Search size={20} />
+              <Heart size={20} />
+              <span className="text-[9px] font-semibold">Wishlist</span>
             </button>
-            <button
-              type="button"
-              aria-label="Cart"
-              onClick={() => setCartOpen(true)}
-              className="relative grid h-10 w-10 place-items-center border border-[#ededed] transition-colors hover:bg-[#f5f5f5]"
-            >
-              <ShoppingCart size={18} />
-              {cartCount > 0 && (
-                <span className="absolute -right-0.5 -top-1 grid h-[17px] min-w-[17px] place-items-center bg-[#f04438] px-1 text-[9px] font-black text-white">
-                  {cartCount}
-                </span>
-              )}
-            </button>
+
             <div className="relative">
               <button
                 type="button"
                 aria-label="Account"
                 onClick={() => setAccountOpen((v) => !v)}
-                className="grid h-10 w-10 place-items-center border border-[#ededed] transition-colors hover:bg-[#f5f5f5]"
+                className="flex flex-col items-center gap-0.5 p-2 text-[#555] hover:text-[#151515] transition-colors"
               >
-                <User size={18} />
+                <User size={20} />
+                <span className="hidden sm:block text-[9px] font-semibold">Account</span>
               </button>
               {accountOpen && (
-                <div className="absolute right-0 top-12 z-50 w-56 border border-[#ededed] bg-white shadow-lg">
+                <div className="absolute right-0 top-14 z-50 w-56 border border-[#ededed] bg-white shadow-lg rounded">
                   <div className="border-b border-[#ededed] px-4 py-3">
                     <p className="text-sm font-black text-[#151515]">Ama Mensah</p>
                     <p className="text-[11px] text-[#777]">ama.mensah@gmail.com</p>
@@ -494,299 +530,459 @@ export const Marketplace: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
-        </header>
 
-        {/* ── Hero ── */}
-        <section
-          className="-mt-[74px] flex h-[355px] items-end justify-center overflow-hidden bg-cover bg-center max-sm:h-[270px]"
-          style={{ backgroundImage: `url(${heroImage})` }}
-        >
-          <h1 className="relative mb-[-54px] text-[clamp(120px,18vw,245px)] font-black leading-[0.72] tracking-normal text-white">
-            Shop
-          </h1>
-        </section>
-
-        {/* ── Shop section ── */}
-        <section id="shop" className="relative z-10 -mt-7 w-full bg-white pt-6">
-          <div className="flex items-center justify-between gap-6 px-10 pb-12 max-lg:flex-col max-lg:items-start max-sm:px-4">
-            <h2 className="text-[25px] font-black text-[#171717]">Give All You Need</h2>
-            <form
-              className="flex h-[31px] w-[410px] items-center gap-2 border border-[#ececec] py-0.5 pl-3 pr-1 max-lg:w-full"
-              onSubmit={(e) => e.preventDefault()}
+            <button
+              type="button"
+              aria-label="Cart"
+              onClick={() => setCartOpen(true)}
+              className="relative flex flex-col items-center gap-0.5 p-2 text-[#555] hover:text-[#151515] transition-colors"
             >
-              <Search size={15} className="text-[#a5a5a5]" />
-              <input
-                ref={searchInputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                aria-label="Search products"
-                placeholder="Search products..."
-                className="min-w-0 flex-1 bg-transparent text-[11px] outline-none placeholder:text-[#a5a5a5]"
-              />
-              <button type="submit" className="h-[25px] bg-[#171717] px-5 text-[10px] font-black text-white hover:bg-black transition-colors">
-                Search
-              </button>
-            </form>
+              <ShoppingCart size={20} />
+              <span className="hidden sm:block text-[9px] font-semibold">Cart</span>
+              {cartCount > 0 && (
+                <span className="absolute right-1 top-1 grid h-[16px] min-w-[16px] place-items-center rounded-full bg-[#f04438] px-1 text-[9px] font-black text-white">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Nav Bar ── */}
+      <nav className="bg-[#151515] text-white relative z-20">
+        <div className="max-w-[1280px] mx-auto px-4 flex items-center h-11 gap-6 text-[12px] font-semibold">
+          <button
+            type="button"
+            onClick={() => setCategoryMenuOpen((v) => !v)}
+            className="flex items-center gap-2 bg-[#f04438] h-full px-4 font-bold hover:bg-[#c0392b] transition-colors flex-shrink-0"
+          >
+            <LayoutGrid size={14} />
+            All Categories
+            <ChevronDown size={13} className={categoryMenuOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
+          </button>
+
+          {['Marketplace', 'New Arrivals', 'Supplier Portal', 'Start Dropshipping', 'API Docs'].map((link) => (
+            <a key={link} href="#" onClick={(e) => e.preventDefault()} className="hidden md:block whitespace-nowrap hover:text-[#f04438] transition-colors">
+              {link}
+            </a>
+          ))}
+
+          <div className="ml-auto flex items-center gap-2 text-[#f04438] font-black hidden md:flex">
+            <Zap size={14} />
+            Special Offer Today!
+          </div>
+        </div>
+
+        {/* Category dropdown */}
+        {categoryMenuOpen && (
+          <div className="absolute left-0 top-full w-64 bg-white text-[#151515] shadow-xl rounded-br-lg z-50 border border-gray-100">
+            {categories.map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => { setActiveCategory(cat.id); setCategoryMenuOpen(false); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-[12px] font-semibold hover:bg-[#f7f7f7] transition-colors ${activeCategory === cat.id ? 'text-[#f04438]' : 'text-[#333]'}`}
+                >
+                  <Icon size={15} className={activeCategory === cat.id ? 'text-[#f04438]' : 'text-[#999]'} />
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </nav>
+
+      {/* Click-away for category menu */}
+      {categoryMenuOpen && (
+        <div className="fixed inset-0 z-10" onClick={() => setCategoryMenuOpen(false)} />
+      )}
+
+      <div className="max-w-[1280px] mx-auto px-4 py-5">
+
+        {/* ── Hero + Sidebar layout ── */}
+        <div className="grid grid-cols-[220px_1fr] gap-4 max-lg:grid-cols-1">
+
+          {/* ── Left Sidebar ── */}
+          <aside className="max-lg:hidden space-y-4">
+            {/* Category list */}
+            <div className="bg-white rounded border border-gray-100 overflow-hidden">
+              <div className="bg-[#151515] text-white px-4 py-3 text-[12px] font-black uppercase tracking-wider">
+                Browse Categories
+              </div>
+              {categories.map((cat) => {
+                const Icon = cat.icon;
+                const count = cat.id === 'all'
+                  ? publishedProducts.length
+                  : publishedProducts.filter((p) => p.product.categoryId === cat.id).length;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => { setActiveCategory(cat.id); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
+                    className={`flex w-full items-center justify-between px-4 py-2.5 text-[12px] font-semibold border-b border-gray-50 hover:bg-[#f7f7f7] transition-colors ${activeCategory === cat.id ? 'bg-[#f04438]/5 text-[#f04438]' : 'text-[#444]'}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon size={14} />
+                      {cat.label}
+                    </span>
+                    <span className="bg-gray-100 text-[10px] font-black text-[#777] px-1.5 py-0.5 rounded">
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Promo card */}
+            <div className="bg-[#151515] text-white rounded p-4 text-center">
+              <Gift size={28} className="mx-auto mb-2 text-[#f04438]" />
+              <p className="text-[11px] font-black uppercase tracking-wider mb-1">Special Deals</p>
+              <p className="text-[10px] text-gray-300 mb-3">Use code for extra savings</p>
+              <div className="bg-[#f04438]/20 border border-[#f04438]/40 rounded px-3 py-2 text-[13px] font-black text-[#f04438] tracking-widest">
+                GHANA20
+              </div>
+            </div>
+
+            {/* On Sale mini list */}
+            <div className="bg-white rounded border border-gray-100 overflow-hidden">
+              <div className="border-b border-gray-100 px-4 py-3 text-[12px] font-black text-[#151515]">
+                On Sale Now
+              </div>
+              <div className="p-2 space-y-2">
+                {topRated.slice(0, 3).map((product, i) => (
+                  <ProductCard
+                    key={`sale-${product.id}-${i}`}
+                    product={product}
+                    onAddToCart={handleAddToCart}
+                    onBuyNow={handleBuyNow}
+                    onOpenDetail={setDetailProduct}
+                    horizontal
+                  />
+                ))}
+              </div>
+            </div>
+          </aside>
+
+          {/* ── Main: Hero + Features ── */}
+          <div className="space-y-4">
+            {/* Hero banners */}
+            <div className="grid grid-cols-[1fr_200px] gap-4 max-sm:grid-cols-1">
+              {/* Main hero */}
+              <div
+                className="relative rounded overflow-hidden bg-cover bg-center min-h-[260px] flex flex-col justify-end p-6"
+                style={{ backgroundImage: `url(${heroImage})` }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-[#151515]/80 to-transparent" />
+                <div className="relative z-10">
+                  <p className="text-[#f04438] text-[11px] font-black uppercase tracking-widest mb-1">New Collection</p>
+                  <h1 className="text-white text-[28px] font-black leading-tight max-w-[260px]">
+                    Shop Local.<br />Earn More.
+                  </h1>
+                  <p className="text-gray-300 text-[12px] mt-2 mb-4">Ghana&apos;s #1 dropshipping platform</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
+                      className="h-9 rounded bg-[#f04438] px-5 text-[11px] font-black text-white hover:bg-[#c0392b] transition-colors"
+                    >
+                      Shop Now
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
+                      className="h-9 rounded border border-white bg-white/10 px-5 text-[11px] font-black text-white hover:bg-white/20 transition-colors"
+                    >
+                      View All
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Side banners */}
+              <div className="grid grid-rows-2 gap-4 max-sm:hidden">
+                <div
+                  className="relative rounded overflow-hidden bg-cover bg-center flex flex-col justify-end p-3"
+                  style={{ backgroundImage: `url(${heroBanner2})` }}
+                >
+                  <div className="absolute inset-0 bg-[#151515]/50 rounded" />
+                  <div className="relative z-10">
+                    <p className="text-white text-[11px] font-black">Electronics</p>
+                    <p className="text-[#f04438] text-[10px] font-semibold">Up to 30% off</p>
+                  </div>
+                </div>
+                <div
+                  className="relative rounded overflow-hidden bg-cover bg-center flex flex-col justify-end p-3"
+                  style={{ backgroundImage: `url(${heroBanner3})` }}
+                >
+                  <div className="absolute inset-0 bg-[#151515]/50 rounded" />
+                  <div className="relative z-10">
+                    <p className="text-white text-[11px] font-black">Accessories</p>
+                    <p className="text-[#f04438] text-[10px] font-semibold">New arrivals daily</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Features strip */}
+            <div className="grid grid-cols-4 gap-3 max-sm:grid-cols-2">
+              {[
+                { icon: Phone, title: 'Customer Support', sub: 'Mon–Sat 8am–8pm' },
+                { icon: CircleDollarSign, title: 'MoMo Payment', sub: 'Fast & secure' },
+                { icon: Tag, title: 'Promo Codes', sub: 'Extra savings daily' },
+                { icon: MapPin, title: 'GhanaPost GPS', sub: 'Nationwide delivery' }
+              ].map((f) => {
+                const Icon = f.icon;
+                return (
+                  <div key={f.title} className="bg-white rounded border border-gray-100 p-3 flex items-center gap-3">
+                    <div className="flex-shrink-0 h-9 w-9 rounded-full bg-[#f04438]/10 grid place-items-center">
+                      <Icon size={16} className="text-[#f04438]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black text-[#151515] truncate">{f.title}</p>
+                      <p className="text-[10px] text-[#888]">{f.sub}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Popular Products ── */}
+        <section id="products" className="mt-6 bg-white rounded border border-gray-100 overflow-hidden">
+          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 gap-4 flex-wrap">
+            <h2 className="text-[16px] font-black text-[#151515]">Popular Products</h2>
+            <div className="flex items-center gap-1">
+              {(['featured', 'bestseller', 'latest'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`h-8 rounded px-4 text-[11px] font-black capitalize transition-colors ${activeTab === tab ? 'bg-[#f04438] text-white' : 'bg-gray-100 text-[#555] hover:bg-gray-200'}`}
+                >
+                  {tab === 'featured' ? 'Featured' : tab === 'bestseller' ? 'Best Seller' : 'Latest'}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <div className="flex h-9 items-center border border-gray-200 rounded overflow-hidden w-52">
+                <Search size={14} className="ml-3 text-gray-400 flex-shrink-0" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Filter products..."
+                  className="flex-1 px-2 text-[11px] outline-none"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-[180px_minmax(0,1fr)] gap-7 px-10 max-lg:grid-cols-1 max-sm:px-4">
-            {/* ── Sidebar ── */}
-            <aside className="max-lg:hidden">
-              <h3 className="mb-4 text-[17px] font-black">Category</h3>
-              <div className="grid gap-1">
+          <div className="p-5">
+            {isLoading ? (
+              <div className="grid grid-cols-4 gap-4 max-lg:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
+                {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
+              </div>
+            ) : pagedProducts.length > 0 ? (
+              <div className="grid grid-cols-4 gap-4 max-lg:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
+                {pagedProducts.map((product, index) => (
+                  <ProductCard
+                    key={`${product.id}-${index}`}
+                    product={product}
+                    onAddToCart={handleAddToCart}
+                    onBuyNow={handleBuyNow}
+                    onOpenDetail={setDetailProduct}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center border border-dashed border-gray-200 rounded p-16 text-center">
+                <Search size={40} className="text-gray-300 mb-4" />
+                <p className="font-black text-[#151515] text-lg">No products found</p>
+                <p className="mt-2 text-sm text-[#777]">Try a different category or search term.</p>
                 <button
                   type="button"
-                  onClick={() => setActiveCategory('all')}
-                  className={`grid h-8 grid-cols-[18px_16px_1fr_auto_auto] items-center gap-2 text-left text-[11px] font-bold px-1 ${
-                    activeCategory === 'all' ? 'bg-[#f0f0f0] text-[#202020]' : 'text-[#555] hover:bg-[#fafafa]'
-                  }`}
+                  onClick={() => { setActiveCategory('all'); setQuery(''); setActiveTab('featured'); }}
+                  className="mt-5 h-10 rounded bg-[#f04438] px-6 text-[11px] font-black text-white transition-colors hover:bg-[#c0392b]"
                 >
-                  <span />
-                  <Folder size={16} />
-                  <span>All Product</span>
-                  <b className="grid h-5 min-w-5 place-items-center bg-[#ff4d5e] px-1 text-[10px] font-black text-white">
-                    {publishedProducts.length}
-                  </b>
-                  <ChevronDown size={13} />
+                  Clear filters
                 </button>
-
-                {[
-                  { id: 'cat-4', label: 'For Home', icon: Home },
-                  { id: 'cat-1', label: 'For Music', icon: Music },
-                  { id: 'cat-6', label: 'For Phone', icon: Phone },
-                  { id: 'cat-5', label: 'For Storage', icon: SlidersHorizontal }
-                ].map((category, index) => {
-                  const Icon = category.icon;
-                  return (
-                    <button
-                      key={category.id}
-                      type="button"
-                      onClick={() => setActiveCategory(category.id)}
-                      className={`grid h-8 grid-cols-[18px_16px_1fr_auto] items-center gap-2 text-left text-[11px] font-bold px-1 ${
-                        activeCategory === category.id ? 'bg-[#f0f0f0] text-[#202020]' : 'text-[#555] hover:bg-[#fafafa]'
-                      }`}
-                    >
-                      <span
-                        className="w-[18px] justify-self-end border-b border-l border-[#d8d8d8]"
-                        style={{ height: index < 3 ? '34px' : 0, marginTop: index < 3 ? '-15px' : 0 }}
-                      />
-                      <Icon size={16} />
-                      <span>{category.label}</span>
-                      {index === 0 ? <ChevronDown size={13} /> : null}
-                    </button>
-                  );
-                })}
-
-                {([
-                  { key: 'new', label: 'New Arrival', icon: Search },
-                  { key: 'bestseller', label: 'Best Seller', icon: Sparkles },
-                  { key: 'discount', label: 'On Discount', icon: CircleDollarSign }
-                ] as const).map((item) => {
-                  const Icon = item.icon;
-                  const active = sortMode === item.key;
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => handleSortToggle(item.key)}
-                      className={`grid h-8 grid-cols-[18px_16px_1fr_auto] items-center gap-2 text-left text-[11px] font-bold px-1 ${
-                        active ? 'bg-[#f0f0f0] text-[#202020]' : 'text-[#555] hover:bg-[#fafafa]'
-                      }`}
-                    >
-                      <span />
-                      <Icon size={16} />
-                      <span>{item.label}</span>
-                      <ChevronDown size={13} className={active ? 'rotate-180 transition-transform' : 'transition-transform'} />
-                    </button>
-                  );
-                })}
               </div>
-            </aside>
+            )}
 
-            {/* ── Product grid ── */}
-            <div>
-              {isLoading ? (
-                <div className="grid grid-cols-3 gap-x-7 gap-y-10 max-lg:grid-cols-2 max-sm:grid-cols-1">
-                  {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
-                </div>
-              ) : pagedProducts.length > 0 ? (
-                <div className="grid grid-cols-3 gap-x-7 gap-y-10 max-lg:grid-cols-2 max-sm:grid-cols-1">
-                  {pagedProducts.map((product, index) => (
-                    <ProductCard
-                      key={`${product.id}-${index}`}
-                      product={product}
-                      onAddToCart={handleAddToCart}
-                      onBuyNow={handleBuyNow}
-                      onOpenDetail={setDetailProduct}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center border border-dashed border-[#d8d8d8] p-16 text-center">
-                  <Search size={40} className="text-[#d8d8d8] mb-4" />
-                  <p className="font-black text-[#151515] text-lg">No products found</p>
-                  <p className="mt-2 text-sm text-[#777]">Try a different category or search term.</p>
-                  <button
-                    type="button"
-                    onClick={() => { setActiveCategory('all'); setQuery(''); setSortMode('default'); }}
-                    className="mt-5 h-10 border border-[#191919] bg-[#191919] px-6 text-[11px] font-black text-white transition-colors hover:bg-black"
-                  >
-                    Clear filters
-                  </button>
-                </div>
-              )}
-
-              {/* ── Pagination ── */}
-              {!isLoading && (
-                <div className="flex items-center justify-between gap-5 py-16 text-[11px] font-black">
-                  <button
-                    type="button"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    className="inline-flex items-center gap-2 disabled:opacity-30 hover:opacity-70 transition-opacity"
-                  >
-                    <ArrowLeft size={14} />
-                    Previous
-                  </button>
-                  <div className="flex items-center gap-3">
-                    {pageNumbers.map((page, i) =>
-                      page === '...' ? (
-                        <span key={`ellipsis-${i}`} className="select-none">...</span>
-                      ) : (
-                        <button
-                          key={page}
-                          type="button"
-                          onClick={() => setCurrentPage(page as number)}
-                          className={`grid h-8 w-8 place-items-center transition-colors ${
-                            currentPage === page ? 'bg-[#191919] text-white' : 'bg-[#f0f0f0] hover:bg-[#e0e0e0]'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      )
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    className="inline-flex items-center gap-2 disabled:opacity-30 hover:opacity-70 transition-opacity"
-                  >
-                    Next
-                    <ArrowRight size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Pagination */}
+            {!isLoading && filteredProducts.length > PAGE_SIZE && (
+              <div className="flex items-center justify-center gap-2 pt-8 text-[11px] font-black">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="grid h-8 w-8 place-items-center rounded border border-gray-200 disabled:opacity-30 hover:border-[#f04438] hover:text-[#f04438] transition-colors"
+                >
+                  <ArrowLeft size={13} />
+                </button>
+                {pageNumbers.map((page, i) =>
+                  page === '...' ? (
+                    <span key={`ellipsis-${i}`} className="select-none px-1">...</span>
+                  ) : (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setCurrentPage(page as number)}
+                      className={`grid h-8 w-8 place-items-center rounded border transition-colors ${
+                        currentPage === page
+                          ? 'border-[#f04438] bg-[#f04438] text-white'
+                          : 'border-gray-200 hover:border-[#f04438] hover:text-[#f04438]'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="grid h-8 w-8 place-items-center rounded border border-gray-200 disabled:opacity-30 hover:border-[#f04438] hover:text-[#f04438] transition-colors"
+                >
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
-        {/* ── Recommendations ── */}
-        <section className="w-full overflow-hidden px-10 pb-[94px] max-sm:px-4">
-          <div className="mb-9 flex items-center justify-between gap-6">
-            <h2 className="text-[34px] font-black text-[#171717]">Explore our recommendations</h2>
-            <div className="flex items-center gap-7">
+        {/* ── Sale Banners ── */}
+        <div className="mt-6 grid grid-cols-3 gap-4 max-md:grid-cols-1">
+          {[
+            { bg: '#151515', title: 'Flash Sale', sub: 'Up to 40% off electronics today', cta: 'Shop Electronics', cat: 'cat-1' },
+            { bg: '#f04438', title: 'New Fashion', sub: 'Fresh styles from Accra designers', cta: 'Browse Fashion', cat: 'cat-2' },
+            { bg: '#1a1a2e', title: 'Home & Living', sub: 'Transform your space for less', cta: 'Shop Home', cat: 'cat-4' }
+          ].map((banner) => (
+            <div
+              key={banner.cat}
+              className="rounded p-6 flex flex-col justify-between min-h-[140px]"
+              style={{ backgroundColor: banner.bg }}
+            >
+              <div>
+                <p className="text-white text-[11px] font-black uppercase tracking-widest opacity-70 mb-1">{banner.sub}</p>
+                <h3 className="text-white text-[22px] font-black leading-tight">{banner.title}</h3>
+              </div>
               <button
                 type="button"
-                aria-label="Previous recommendation"
-                onClick={() => scrollRecs('left')}
-                className="hover:opacity-60 transition-opacity"
+                onClick={() => { setActiveCategory(banner.cat); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
+                className="mt-4 self-start h-8 rounded bg-white/20 border border-white/40 px-4 text-[11px] font-black text-white hover:bg-white/30 transition-colors"
               >
-                <ArrowLeft size={22} />
-              </button>
-              <button
-                type="button"
-                aria-label="Next recommendation"
-                onClick={() => scrollRecs('right')}
-                className="hover:opacity-60 transition-opacity"
-              >
-                <ArrowRight size={22} />
+                {banner.cta} →
               </button>
             </div>
+          ))}
+        </div>
+
+        {/* ── Our Categories ── */}
+        <section className="mt-6 bg-white rounded border border-gray-100 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[16px] font-black text-[#151515]">Our Categories</h2>
+            <button type="button" className="text-[11px] font-semibold text-[#f04438] hover:underline">View all →</button>
           </div>
-          <div
-            ref={recsRef}
-            className="grid auto-cols-[330px] grid-flow-col gap-7 overflow-x-auto pb-2 max-sm:auto-cols-[82vw]"
-            style={{ scrollbarWidth: 'none' }}
-          >
-            {recommendations.concat(recommendations).map((product, index) => (
+          <div className="grid grid-cols-6 gap-3 max-md:grid-cols-3 max-sm:grid-cols-2">
+            {[
+              { id: 'cat-1', label: 'Electronics', icon: Zap, color: '#3b82f6' },
+              { id: 'cat-2', label: 'Fashion', icon: Heart, color: '#ec4899' },
+              { id: 'cat-3', label: 'Beauty', icon: Star, color: '#f59e0b' },
+              { id: 'cat-4', label: 'Home', icon: Package, color: '#10b981' },
+              { id: 'cat-5', label: 'Health', icon: Gift, color: '#8b5cf6' },
+              { id: 'cat-6', label: 'Food', icon: Tag, color: '#f04438' }
+            ].map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => { setActiveCategory(cat.id); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
+                  className="flex flex-col items-center gap-2 p-4 rounded border border-gray-100 hover:border-[#f04438] hover:shadow-sm transition-all group"
+                >
+                  <div
+                    className="h-10 w-10 rounded-full grid place-items-center"
+                    style={{ backgroundColor: `${cat.color}15` }}
+                  >
+                    <Icon size={20} style={{ color: cat.color }} />
+                  </div>
+                  <span className="text-[11px] font-bold text-[#444] group-hover:text-[#f04438] transition-colors">{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ── Top Rated ── */}
+        <section className="mt-6 bg-white rounded border border-gray-100 overflow-hidden">
+          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+            <h2 className="text-[16px] font-black text-[#151515]">Top Rated Products</h2>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('featured'); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
+              className="text-[11px] font-semibold text-[#f04438] hover:underline"
+            >
+              View all →
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-4 p-5 max-md:grid-cols-2 max-sm:grid-cols-1">
+            {topRated.map((product, i) => (
               <ProductCard
-                key={`rec-${product.id}-${index}`}
+                key={`rated-${product.id}-${i}`}
                 product={product}
-                compact
                 onAddToCart={handleAddToCart}
                 onBuyNow={handleBuyNow}
                 onOpenDetail={setDetailProduct}
+                horizontal
               />
             ))}
           </div>
         </section>
 
-        {/* ── CTA / Blog ── */}
-        <section
-          id="blog"
-          className="mx-8 mb-16 grid min-h-[234px] grid-cols-[1.1fr_0.9fr] items-end gap-11 bg-gradient-to-b from-[#373737] to-[#111] p-8 text-white max-lg:grid-cols-1 max-sm:mx-4"
-        >
+        {/* ── Newsletter CTA ── */}
+        <section className="mt-6 bg-gradient-to-r from-[#151515] to-[#2d2d2d] rounded p-8 text-white flex items-center justify-between gap-8 flex-wrap">
           <div>
-            <h2 className="mb-9 text-[43px] font-black leading-[0.95] tracking-normal max-sm:text-[34px]">
-              Ready to Get<br />Our New Stuff?
-            </h2>
-            {emailSubmitted ? (
-              <div className="flex items-center gap-2 text-sm font-bold text-accent">
-                <CheckCircle2 size={18} />
-                Thanks! You're subscribed.
-              </div>
-            ) : (
-              <form
-                className="flex h-[31px] w-[230px] items-center bg-white p-[3px]"
-                onSubmit={handleEmailSubmit}
+            <h2 className="text-[24px] font-black mb-1">Stay in the Loop</h2>
+            <p className="text-gray-300 text-[13px]">Get the latest deals and new arrivals straight to your inbox.</p>
+          </div>
+          {emailSubmitted ? (
+            <div className="flex items-center gap-2 text-sm font-bold text-[#f04438]">
+              <CheckCircle2 size={18} />
+              Thanks! You&apos;re subscribed.
+            </div>
+          ) : (
+            <form className="flex gap-2" onSubmit={handleEmailSubmit}>
+              <input
+                required
+                type="email"
+                aria-label="Your Email"
+                placeholder="Enter your email address"
+                className="h-11 rounded border border-white/20 bg-white/10 px-4 text-[12px] text-white placeholder:text-gray-400 outline-none focus:border-[#f04438] w-64"
+              />
+              <button
+                type="submit"
+                className="h-11 rounded bg-[#f04438] px-6 text-[11px] font-black text-white hover:bg-[#c0392b] transition-colors"
               >
-                <input
-                  required
-                  type="email"
-                  aria-label="Your Email"
-                  placeholder="Your Email"
-                  className="min-w-0 flex-1 px-4 text-[10px] text-[#111] outline-none"
-                />
-                <button
-                  type="submit"
-                  className="h-[25px] bg-[#171717] px-4 text-[10px] font-black text-white hover:bg-black transition-colors"
-                >
-                  Send
-                </button>
-              </form>
-            )}
-          </div>
-          <div className="pb-3 pr-10 max-lg:p-0">
-            <h3 className="mb-3 text-[13px] font-black">Local Drop Shipping GH</h3>
-            <p className="max-w-[350px] text-xs leading-7 text-[#e7e7e7]">
-              Ghana's #1 local dropshipping platform. Connect with verified suppliers, import products instantly, and earn commissions via MoMo.
-            </p>
-          </div>
+                Subscribe
+              </button>
+            </form>
+          )}
         </section>
+      </div>
 
-        {/* ── Footer ── */}
-        <footer className="mb-14 grid w-full grid-cols-[1fr_auto] gap-8 px-10 max-lg:grid-cols-1 max-sm:px-4">
-          <div className="flex gap-[105px] max-sm:gap-14">
-            <div>
-              <h3 className="mb-6 text-[17px] font-black">About</h3>
-              <a href="#blog" onClick={(e) => { e.preventDefault(); scrollTo('blog'); }} className="mb-3 block text-[13px] font-semibold text-[#606060] hover:text-[#151515]">Blog</a>
-              <a href="#blog" onClick={(e) => { e.preventDefault(); scrollTo('blog'); }} className="mb-3 block text-[13px] font-semibold text-[#606060] hover:text-[#151515]">Meet The Team</a>
-              <a href="#blog" onClick={(e) => { e.preventDefault(); scrollTo('blog'); }} className="block text-[13px] font-semibold text-[#606060] hover:text-[#151515]">Contact Us</a>
-            </div>
-            <div>
-              <h3 className="mb-6 text-[17px] font-black">Support</h3>
-              <a href="#blog" onClick={(e) => { e.preventDefault(); scrollTo('blog'); }} className="mb-3 block text-[13px] font-semibold text-[#606060] hover:text-[#151515]">Contact Us</a>
-              <a href="#shop" onClick={(e) => { e.preventDefault(); scrollTo('shop'); }} className="mb-3 block text-[13px] font-semibold text-[#606060] hover:text-[#151515]">Shipping</a>
-              <a href="#shop" onClick={(e) => { e.preventDefault(); scrollTo('shop'); }} className="mb-3 block text-[13px] font-semibold text-[#606060] hover:text-[#151515]">Return</a>
-              <a href="#shop" onClick={(e) => { e.preventDefault(); scrollTo('shop'); }} className="block text-[13px] font-semibold text-[#606060] hover:text-[#151515]">FAQ</a>
-            </div>
-          </div>
-
-          <div className="self-end text-[13px] font-bold text-[#8d8d8d]">
-            <span>Social Media</span>
-            <div className="mt-3 flex items-center gap-3">
+      {/* ── Footer ── */}
+      <footer className="mt-8 bg-[#151515] text-white">
+        <div className="max-w-[1280px] mx-auto px-4 py-12 grid grid-cols-4 gap-8 max-lg:grid-cols-2 max-sm:grid-cols-1">
+          <div>
+            <h3 className="text-[16px] font-black mb-1">Local Drop Shipping <span className="text-[#f04438]">GH</span></h3>
+            <p className="text-[12px] text-gray-400 leading-relaxed mt-2">
+              Ghana&apos;s #1 local dropshipping platform. Connect with verified suppliers and earn commissions via MTN MoMo.
+            </p>
+            <div className="flex gap-2 mt-4">
               {[
                 { label: 'X', url: 'https://twitter.com' },
                 { label: 'f', url: 'https://facebook.com' },
@@ -799,23 +995,52 @@ export const Marketplace: React.FC = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={item.label}
-                  className="grid h-10 w-10 place-items-center bg-[#171717] text-base font-black text-white hover:bg-[#333] transition-colors"
+                  className="grid h-8 w-8 place-items-center rounded bg-white/10 text-[12px] font-black text-white hover:bg-[#f04438] transition-colors"
                 >
                   {item.label}
                 </a>
               ))}
             </div>
           </div>
-        </footer>
 
-        <div className="flex h-[68px] items-center justify-between border-t border-[#ededed] px-16 text-[11px] font-bold text-[#8a8a8a] max-sm:h-auto max-sm:flex-col max-sm:items-start max-sm:gap-4 max-sm:p-6">
-          <span>Copyright 2023 Uranghu. All Rights Reserved.</span>
-          <div className="flex gap-10 text-[#303030]">
-            <a href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:underline">Terms of Service</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:underline">Privacy Policy</a>
+          <div>
+            <h4 className="text-[13px] font-black mb-4 text-gray-200">Quick Links</h4>
+            {['Marketplace', 'Start Dropshipping', 'Supplier Portal', 'Admin Panel'].map((link) => (
+              <a key={link} href="#" onClick={(e) => e.preventDefault()} className="block text-[12px] text-gray-400 hover:text-white mb-2 transition-colors">
+                {link}
+              </a>
+            ))}
+          </div>
+
+          <div>
+            <h4 className="text-[13px] font-black mb-4 text-gray-200">Support</h4>
+            {['Contact Us', 'Shipping Info', 'Return Policy', 'FAQ', 'Track Order'].map((link) => (
+              <a key={link} href="#" onClick={(e) => e.preventDefault()} className="block text-[12px] text-gray-400 hover:text-white mb-2 transition-colors">
+                {link}
+              </a>
+            ))}
+          </div>
+
+          <div>
+            <h4 className="text-[13px] font-black mb-4 text-gray-200">Contact</h4>
+            <div className="space-y-2 text-[12px] text-gray-400">
+              <p className="flex items-center gap-2"><Phone size={12} /> +233 244 123 456</p>
+              <p className="flex items-center gap-2"><MapPin size={12} /> Accra, Ghana</p>
+              <p className="flex items-center gap-2"><Truck size={12} /> Nationwide Delivery</p>
+            </div>
           </div>
         </div>
-      </section>
+
+        <div className="border-t border-white/10">
+          <div className="max-w-[1280px] mx-auto px-4 py-4 flex items-center justify-between gap-4 flex-wrap text-[11px] text-gray-500">
+            <span>Copyright {new Date().getFullYear()} Local Drop Shipping GH. All Rights Reserved.</span>
+            <div className="flex gap-6">
+              <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-white transition-colors">Terms of Service</a>
+              <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-white transition-colors">Privacy Policy</a>
+            </div>
+          </div>
+        </div>
+      </footer>
 
       {/* ── Product Detail Modal ── */}
       {detailProduct && (
@@ -827,16 +1052,16 @@ export const Marketplace: React.FC = () => {
         />
       )}
 
-      {/* ── Cart drawer ── */}
+      {/* ── Cart Drawer ── */}
       {cartOpen && (
         <div className="fixed inset-0 z-50 bg-black/40" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) setCartOpen(false); }}>
           <aside className="ml-auto flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 p-5">
               <div>
-                <h2 className="text-lg font-black">Shopping cart</h2>
-                <p className="text-xs text-[#777]">{cartCount} item{cartCount === 1 ? '' : 's'} selected</p>
+                <h2 className="text-lg font-black">Shopping Cart</h2>
+                <p className="text-xs text-[#777]">{cartCount} item{cartCount === 1 ? '' : 's'}</p>
               </div>
-              <button type="button" onClick={() => setCartOpen(false)} className="grid h-9 w-9 place-items-center border border-gray-200 hover:bg-gray-50">
+              <button type="button" onClick={() => setCartOpen(false)} className="grid h-9 w-9 place-items-center rounded border border-gray-200 hover:bg-gray-50">
                 <X size={18} />
               </button>
             </div>
@@ -852,8 +1077,8 @@ export const Marketplace: React.FC = () => {
                 </div>
               ) : (
                 cartLines.map((line) => (
-                  <div key={line.dropshipperProductId} className="grid grid-cols-[76px_1fr] gap-3 border border-gray-200 p-3">
-                    <img src={line.item.product.images[0]} alt={line.item.product.name} className="h-20 w-full bg-gray-100 object-contain p-2" />
+                  <div key={line.dropshipperProductId} className="grid grid-cols-[76px_1fr] gap-3 rounded border border-gray-200 p-3">
+                    <img src={line.item.product.images[0]} alt={line.item.product.name} className="h-20 w-full bg-gray-100 object-contain p-2 rounded" />
                     <div className="min-w-0">
                       <div className="flex items-start justify-between gap-3">
                         <h3 className="line-clamp-2 text-sm font-black leading-tight">{line.item.product.name}</h3>
@@ -863,7 +1088,7 @@ export const Marketplace: React.FC = () => {
                       </div>
                       <p className="mt-1 text-xs font-bold text-[#777]">{formatMoney(line.item.sellingPrice)}</p>
                       <div className="mt-3 flex items-center justify-between">
-                        <div className="inline-flex items-center overflow-hidden border border-gray-200">
+                        <div className="inline-flex items-center overflow-hidden rounded border border-gray-200">
                           <button type="button" onClick={() => updateCartQuantity(line.dropshipperProductId, line.quantity - 1)} className="grid h-8 w-8 place-items-center hover:bg-gray-50">
                             <Minus size={14} />
                           </button>
@@ -901,44 +1126,38 @@ export const Marketplace: React.FC = () => {
                 type="button"
                 disabled={cartLines.length === 0}
                 onClick={() => setCheckoutOpen(true)}
-                className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 bg-[#191919] text-sm font-black text-white hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-300 transition-colors"
+                className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded bg-[#f04438] text-sm font-black text-white hover:bg-[#c0392b] disabled:cursor-not-allowed disabled:bg-gray-300 transition-colors"
               >
-                Checkout
-                <ArrowRight size={17} />
+                Checkout <ArrowRight size={17} />
               </button>
             </div>
           </aside>
         </div>
       )}
 
-      {/* ── Checkout modal ── */}
+      {/* ── Checkout Modal ── */}
       {checkoutOpen && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4" role="dialog" aria-modal="true">
-          <form onSubmit={handleCheckout} className="w-full max-w-lg bg-white p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleCheckout} className="w-full max-w-lg rounded bg-white p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-black">Checkout</h2>
-                <p className="text-xs text-[#777]">Demo checkout creates an order in local state.</p>
+                <p className="text-xs text-[#777]">Demo checkout — creates a local order.</p>
               </div>
-              <button type="button" onClick={() => setCheckoutOpen(false)} className="grid h-9 w-9 place-items-center border border-gray-200 hover:bg-gray-50">
+              <button type="button" onClick={() => setCheckoutOpen(false)} className="grid h-9 w-9 place-items-center rounded border border-gray-200 hover:bg-gray-50">
                 <X size={18} />
               </button>
             </div>
 
-            {/* Promo code field */}
             <div className="mb-4">
               <label className="block text-xs font-black text-[#777] mb-1">Promo Code</label>
               {appliedPromo ? (
-                <div className="flex items-center justify-between h-11 border border-[#f04438]/30 bg-[#fff5f5] px-4">
+                <div className="flex items-center justify-between h-11 rounded border border-[#f04438]/30 bg-[#fff5f5] px-4">
                   <span className="text-sm font-black text-[#f04438] flex items-center gap-2">
                     <Tag size={14} />
                     {appliedPromo.code} — {Math.round(appliedPromo.discount * 100)}% off applied!
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => { clearPromo(); setPromoInput(''); setPromoError(''); }}
-                    className="text-gray-400 hover:text-[#f04438]"
-                  >
+                  <button type="button" onClick={() => { clearPromo(); setPromoInput(''); setPromoError(''); }} className="text-gray-400 hover:text-[#f04438]">
                     <X size={14} />
                   </button>
                 </div>
@@ -949,12 +1168,12 @@ export const Marketplace: React.FC = () => {
                     value={promoInput}
                     onChange={(e) => { setPromoInput(e.target.value); setPromoError(''); }}
                     placeholder="e.g. GHANA20"
-                    className="flex-1 h-11 border border-gray-200 px-4 text-sm text-[#1c1c1c] outline-none focus:border-[#191919] uppercase"
+                    className="flex-1 h-11 rounded border border-gray-200 px-4 text-sm text-[#1c1c1c] outline-none focus:border-[#f04438] uppercase"
                   />
                   <button
                     type="button"
                     onClick={handleApplyPromo}
-                    className="h-11 border border-[#191919] bg-[#191919] px-4 text-[11px] font-black text-white hover:bg-black transition-colors"
+                    className="h-11 rounded border border-[#f04438] bg-[#f04438] px-4 text-[11px] font-black text-white hover:bg-[#c0392b] transition-colors"
                   >
                     Apply
                   </button>
@@ -974,17 +1193,17 @@ export const Marketplace: React.FC = () => {
               ].map((f) => (
                 <label key={f.name} className="grid gap-1 text-xs font-black text-[#777]">
                   {f.label}
-                  <input name={f.name} defaultValue={f.value} required className="h-11 border border-gray-200 px-4 text-sm text-[#1c1c1c] outline-none focus:border-[#191919]" />
+                  <input name={f.name} defaultValue={f.value} required className="h-11 rounded border border-gray-200 px-4 text-sm text-[#1c1c1c] outline-none focus:border-[#f04438]" />
                 </label>
               ))}
             </div>
 
             <label className="mt-3 grid gap-1 text-xs font-black text-[#777]">
               Delivery note
-              <textarea name="notes" rows={3} className="border border-gray-200 px-4 py-3 text-sm text-[#1c1c1c] outline-none focus:border-[#191919]" />
+              <textarea name="notes" rows={3} className="rounded border border-gray-200 px-4 py-3 text-sm text-[#1c1c1c] outline-none focus:border-[#f04438]" />
             </label>
 
-            <div className="mt-5 bg-gray-50 p-4 space-y-1">
+            <div className="mt-5 rounded bg-gray-50 p-4 space-y-1">
               <div className="flex justify-between text-sm text-[#777]">
                 <span>Subtotal</span><span>{formatMoney(cartSubtotal)}</span>
               </div>
@@ -999,12 +1218,11 @@ export const Marketplace: React.FC = () => {
               <div className="flex justify-between text-sm font-black border-t border-gray-200 pt-2">
                 <span>Total payable</span><span>{formatMoney(cartTotal)}</span>
               </div>
-              <p className="mt-1 text-xs text-[#777]">Payment provider: MTN MoMo demo</p>
+              <p className="mt-1 text-xs text-[#777]">Payment: MTN MoMo (demo)</p>
             </div>
 
-            <button type="submit" className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 bg-[#191919] text-sm font-black text-white hover:bg-black transition-colors">
-              Place order
-              <CreditCard size={17} />
+            <button type="submit" className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded bg-[#f04438] text-sm font-black text-white hover:bg-[#c0392b] transition-colors">
+              Place Order <CreditCard size={17} />
             </button>
           </form>
         </div>
@@ -1012,12 +1230,12 @@ export const Marketplace: React.FC = () => {
 
       {/* ── Order success toast ── */}
       {orderNumber && (
-        <div className="fixed bottom-5 left-1/2 z-[70] w-[calc(100%-32px)] max-w-md -translate-x-1/2 border border-accent/20 bg-white p-4 shadow-2xl">
+        <div className="fixed bottom-5 left-1/2 z-[70] w-[calc(100%-32px)] max-w-md -translate-x-1/2 rounded border border-[#f04438]/20 bg-white p-4 shadow-2xl">
           <div className="flex gap-3">
-            <CheckCircle2 className="shrink-0 text-accent" size={24} />
+            <CheckCircle2 className="shrink-0 text-[#f04438]" size={24} />
             <div className="min-w-0">
               <p className="font-black text-[#1c1c1c]">Order placed: {orderNumber}</p>
-              <p className="mt-1 text-xs leading-5 text-[#777]">Your checkout created an order and cleared the cart.</p>
+              <p className="mt-1 text-xs leading-5 text-[#777]">Your order has been placed and cart cleared.</p>
             </div>
             <button type="button" onClick={() => setOrderNumber(null)} className="ml-auto text-gray-400 hover:text-[#1c1c1c]">
               <X size={16} />
@@ -1026,7 +1244,7 @@ export const Marketplace: React.FC = () => {
         </div>
       )}
 
-      {/* ── Click-away for account dropdown ── */}
+      {/* Click-away for account dropdown */}
       {accountOpen && (
         <div className="fixed inset-0 z-40" onClick={() => setAccountOpen(false)} />
       )}
