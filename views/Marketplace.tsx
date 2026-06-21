@@ -233,6 +233,80 @@ export const Marketplace: React.FC = () => {
     <main className="min-h-screen bg-white text-[#1c1c1c]">
       <section className="w-full overflow-hidden bg-white">
 
+        {/* ── Navbar ── */}
+        <header className="relative z-20 grid h-[74px] w-full grid-cols-[1fr_auto_1fr] items-center bg-white px-10 max-sm:grid-cols-[1fr_auto] max-sm:px-4">
+          <a
+            href="#"
+            onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="inline-flex items-center gap-2 text-[17px] font-black text-[#151515]"
+          >
+            <span className="flex h-7 w-7 items-center justify-center bg-primary text-accent text-xs font-black">LD</span>
+            <span className="text-primary">Local Drop Shipping <span className="text-accent">GH</span></span>
+          </a>
+
+          <nav className="flex items-center gap-8 text-xs font-black max-sm:hidden">
+            <a href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-primary transition-colors">Marketplace</a>
+            <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary transition-colors">Start Dropshipping</a>
+            <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary transition-colors">Supplier Portal</a>
+            <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary transition-colors">Admin Panel</a>
+            <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary transition-colors">API Docs & ERD</a>
+          </nav>
+
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              aria-label="Search"
+              onClick={focusSearch}
+              className="grid h-10 w-10 place-items-center border border-[#ededed] transition-colors hover:bg-[#f5f5f5]"
+            >
+              <Search size={20} />
+            </button>
+            <button
+              type="button"
+              aria-label="Cart"
+              onClick={() => setCartOpen(true)}
+              className="relative grid h-10 w-10 place-items-center border border-[#ededed] transition-colors hover:bg-[#f5f5f5]"
+            >
+              <ShoppingCart size={18} />
+              {cartCount > 0 && (
+                <span className="absolute -right-0.5 -top-1 grid h-[17px] min-w-[17px] place-items-center bg-[#f04438] px-1 text-[9px] font-black text-white">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+            <div className="relative">
+              <button
+                type="button"
+                aria-label="Account"
+                onClick={() => setAccountOpen((v) => !v)}
+                className="grid h-10 w-10 place-items-center border border-[#ededed] transition-colors hover:bg-[#f5f5f5]"
+              >
+                <User size={18} />
+              </button>
+              {accountOpen && (
+                <div className="absolute right-0 top-12 z-50 w-56 border border-[#ededed] bg-white shadow-lg">
+                  <div className="border-b border-[#ededed] px-4 py-3">
+                    <p className="text-sm font-black text-[#151515]">Ama Mensah</p>
+                    <p className="text-[11px] text-[#777]">ama.mensah@gmail.com</p>
+                  </div>
+                  <div className="py-1">
+                    {['My Orders', 'Wishlist', 'Settings', 'Sign Out'].map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setAccountOpen(false)}
+                        className="w-full px-4 py-2 text-left text-[12px] font-semibold text-[#333] hover:bg-[#f5f5f5]"
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
         {/* ── Hero ── */}
         <section
           className="-mt-[74px] flex h-[355px] items-end justify-center overflow-hidden bg-cover bg-center max-sm:h-[270px]"
