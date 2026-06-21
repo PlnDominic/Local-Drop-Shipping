@@ -33,3 +33,4 @@ backend/.env.local
 # Backend build
 backend/dist
 backend/node_modules
+.claude/
