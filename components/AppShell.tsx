@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
-import { Navigation } from './Navigation';
 import { Marketplace } from '../views/Marketplace';
 import { DropshipperDashboard } from '../views/DropshipperDashboard';
 import { SupplierDashboard } from '../views/SupplierDashboard';
@@ -64,7 +63,6 @@ const AppShell: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <Navigation />
 
       {/* Simulator Device Wrapper */}
       {mobilePreview ? (
