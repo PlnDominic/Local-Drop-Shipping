@@ -431,7 +431,6 @@ export const Marketplace: React.FC = () => {
             onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             className="inline-flex items-center gap-2 text-[17px] font-black text-[#151515]"
           >
-            <span className="flex h-7 w-7 items-center justify-center bg-primary text-accent text-xs font-black">LD</span>
             <span className="text-primary">Local Drop Shipping <span className="text-accent">GH</span></span>
           </a>
 
