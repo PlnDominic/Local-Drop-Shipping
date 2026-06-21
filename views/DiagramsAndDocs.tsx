@@ -163,7 +163,7 @@ export const DiagramsAndDocs: React.FC = () => {
   const getMethodColor = (m: string) => {
     switch (m) {
       case 'GET': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'POST': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'POST': return 'bg-accent-light text-accent-dark border-accent/20';
       case 'PUT': 
       case 'PATCH': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
       case 'DELETE': return 'bg-red-50 text-red-700 border-red-200';
@@ -242,18 +242,18 @@ export const DiagramsAndDocs: React.FC = () => {
                 <text x="660" y="92" textAnchor="middle" fill="#0f172a" fontSize="10" fontWeight="bold">Admin Control Console</text>
 
                 {/* Arrow Client -> CDN */}
-                <line x1="400" y1="120" x2="400" y2="160" stroke="#006B3F" strokeWidth="3" markerEnd="url(#arrow)" strokeDasharray="4 4" />
+                <line x1="400" y1="120" x2="400" y2="160" stroke="#151515" strokeWidth="3" markerEnd="url(#arrow)" strokeDasharray="4 4" />
 
                 {/* Edge CDN */}
-                <rect x="250" y="160" width="300" height="40" rx="10" fill="#006B3F" />
+                <rect x="250" y="160" width="300" height="40" rx="10" fill="#151515" />
                 <text x="400" y="185" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">Vercel Edge Network / Cloudflare CDN</text>
 
                 {/* Arrow CDN -> Backend */}
-                <line x1="400" y1="200" x2="400" y2="240" stroke="#006B3F" strokeWidth="3" markerEnd="url(#arrow)" />
+                <line x1="400" y1="200" x2="400" y2="240" stroke="#151515" strokeWidth="3" markerEnd="url(#arrow)" />
 
                 {/* NestJS Monolith */}
-                <rect x="80" y="240" width="640" height="150" rx="16" fill="#f8fafc" stroke="#006B3F" strokeWidth="2" />
-                <text x="400" y="265" textAnchor="middle" fill="#006B3F" fontSize="12" fontWeight="black">Nest.js Modular Monolith Engine</text>
+                <rect x="80" y="240" width="640" height="150" rx="16" fill="#f8fafc" stroke="#151515" strokeWidth="2" />
+                <text x="400" y="265" textAnchor="middle" fill="#151515" fontSize="12" fontWeight="black">Nest.js Modular Monolith Engine</text>
 
                 {/* Modules */}
                 <rect x="110" y="290" width="120" height="30" rx="6" fill="#ffffff" stroke="#e2e8f0" />
@@ -277,8 +277,8 @@ export const DiagramsAndDocs: React.FC = () => {
                 <line x1="550" y1="390" x2="550" y2="440" stroke="#475569" strokeWidth="2.5" markerEnd="url(#arrow)" />
 
                 {/* Database Services */}
-                <rect x="60" y="440" width="320" height="60" rx="12" fill="#006B3F" fillOpacity="0.05" stroke="#006B3F" strokeWidth="1.5" />
-                <text x="220" y="465" textAnchor="middle" fill="#006B3F" fontSize="11" fontWeight="bold">Supabase PostgreSQL Database</text>
+                <rect x="60" y="440" width="320" height="60" rx="12" fill="#151515" fillOpacity="0.05" stroke="#151515" strokeWidth="1.5" />
+                <text x="220" y="465" textAnchor="middle" fill="#151515" fontSize="11" fontWeight="bold">Supabase PostgreSQL Database</text>
                 <text x="220" y="485" textAnchor="middle" fill="#475569" fontSize="9">Row Level Security (RLS) + JWT Auth</text>
 
                 <rect x="420" y="440" width="320" height="60" rx="12" fill="#fcd116" fillOpacity="0.05" stroke="#d6b00c" strokeWidth="1.5" />
@@ -288,7 +288,7 @@ export const DiagramsAndDocs: React.FC = () => {
                 {/* SVG Marker Definitions */}
                 <defs>
                   <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#006B3F" />
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#151515" />
                   </marker>
                 </defs>
               </svg>
@@ -342,13 +342,13 @@ export const DiagramsAndDocs: React.FC = () => {
 
               {/* Table DROPSHIPPER PROFILES */}
               <div className="bg-gray-50 border border-gray-200 overflow-hidden text-xs">
-                <div className="bg-emerald-800 text-white p-3 font-bold flex justify-between">
+                <div className="bg-neutral-dark text-white p-3 font-bold flex justify-between">
                   <span>dropshipper_profiles</span>
-                  <span className="text-[10px] text-emerald-300">Entity</span>
+                  <span className="text-[10px] text-accent-light">Entity</span>
                 </div>
                 <div className="p-3 space-y-1.5 font-mono text-[10px]">
                   <div className="flex justify-between"><span className="font-bold">id</span><span className="text-gray-400">UUID (PK)</span></div>
-                  <div className="flex justify-between text-emerald-600"><span>user_id</span><span className="text-gray-400">UUID (FK)</span></div>
+                  <div className="flex justify-between text-accent"><span>user_id</span><span className="text-gray-400">UUID (FK)</span></div>
                   <div className="flex justify-between"><span>store_name</span><span className="text-gray-400">TEXT</span></div>
                   <div className="flex justify-between"><span>store_slug</span><span className="text-gray-400">TEXT UNIQUE</span></div>
                   <div className="flex justify-between"><span>commission_rate</span><span className="text-gray-400">DECIMAL</span></div>
@@ -381,7 +381,7 @@ export const DiagramsAndDocs: React.FC = () => {
                   <div className="flex justify-between"><span className="font-bold">id</span><span className="text-gray-400">UUID (PK)</span></div>
                   <div className="flex justify-between"><span>order_number</span><span className="text-gray-400">TEXT UNIQUE</span></div>
                   <div className="flex justify-between text-blue-600"><span>customer_id</span><span className="text-gray-400">UUID (FK)</span></div>
-                  <div className="flex justify-between text-emerald-600"><span>dropshipper_id</span><span className="text-gray-400">UUID (FK)</span></div>
+                  <div className="flex justify-between text-accent"><span>dropshipper_id</span><span className="text-gray-400">UUID (FK)</span></div>
                   <div className="flex justify-between text-purple-700"><span>supplier_id</span><span className="text-gray-400">UUID (FK)</span></div>
                   <div className="flex justify-between"><span>status</span><span className="text-gray-400">VARCHAR</span></div>
                   <div className="flex justify-between"><span>total_amount</span><span className="text-gray-400">DECIMAL</span></div>
@@ -486,7 +486,7 @@ export const DiagramsAndDocs: React.FC = () => {
             {(apiOutput || apiLoading) && (
               <div className="bg-[#1e293b] p-6 shadow-xl border border-slate-800 space-y-4 animate-slide-up">
                 <div className="flex justify-between items-center text-xs font-bold text-slate-400 border-b border-slate-800 pb-3">
-                  <span className="flex items-center gap-1.5 text-emerald-400">
+                  <span className="flex items-center gap-1.5 text-accent">
                     <Terminal size={14} />
                     SIMULATED RESPONSE: 200 OK
                   </span>

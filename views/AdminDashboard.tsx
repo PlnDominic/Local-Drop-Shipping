@@ -32,7 +32,7 @@ export const AdminDashboard: React.FC = () => {
     switch (type) {
       case 'sms': return <Smartphone size={14} className="text-blue-500" />;
       case 'email': return <Mail size={14} className="text-purple-500" />;
-      case 'whatsapp': return <MessageSquare size={14} className="text-emerald-500" />;
+      case 'whatsapp': return <MessageSquare size={14} className="text-accent" />;
     }
   };
 
@@ -140,11 +140,11 @@ export const AdminDashboard: React.FC = () => {
                       <tr key={c.id}>
                         <td className="py-3 font-semibold text-primary">{c.orderNumber}</td>
                         <td className="py-3">Kofi's Express Deals</td>
-                        <td className="py-3 font-extrabold text-emerald-600">₵{c.amount.toFixed(2)}</td>
+                        <td className="py-3 font-extrabold text-accent">₵{c.amount.toFixed(2)}</td>
                         <td className="py-3">
                           <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-wider border ${
                             c.status === 'paid' 
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                              ? 'bg-accent-light text-accent-dark border-accent/20' 
                               : 'bg-yellow-50 text-yellow-700 border-yellow-200'
                           }`}>
                             {c.status}

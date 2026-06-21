@@ -146,7 +146,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       <span className="text-sm font-black text-neutral-dark">₵260.00 retail</span>
                     </div>
                   </div>
-                  <span className="bg-emerald-500 text-white font-black text-xs px-2.5 py-1">
+                  <span className="bg-accent text-white font-black text-xs px-2.5 py-1">
                     +₵80 Margin
                   </span>
                 </div>
@@ -173,7 +173,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <span>Supplier paid:</span>
                   <span>-₵180.00</span>
                 </div>
-                <div className="flex justify-between text-emerald-600 font-extrabold border-t border-gray-200 pt-1 text-sm">
+                <div className="flex justify-between text-accent font-extrabold border-t border-gray-200 pt-1 text-sm">
                   <span>Your Net Profit:</span>
                   <span>₵80.00</span>
                 </div>

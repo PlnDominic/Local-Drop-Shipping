@@ -81,7 +81,7 @@ const AppShell: React.FC = () => {
             <div className="h-11 bg-white text-neutral-dark px-6 flex justify-between items-end pb-1.5 text-[11px] font-bold z-40 select-none">
               <span>10:09</span>
               <div className="flex items-center gap-1.5">
-                <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1 py-0.2 font-black border border-emerald-200">5G</span>
+                <span className="text-[9px] text-accent bg-accent-light px-1 py-0.2 font-black border border-accent/20">5G</span>
                 <Wifi size={12} />
                 <Battery size={14} className="fill-current" />
               </div>

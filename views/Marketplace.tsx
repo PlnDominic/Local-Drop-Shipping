@@ -527,7 +527,7 @@ export const Marketplace: React.FC = () => {
               Ready to Get<br />Our New Stuff?
             </h2>
             {emailSubmitted ? (
-              <div className="flex items-center gap-2 text-sm font-bold text-emerald-400">
+              <div className="flex items-center gap-2 text-sm font-bold text-accent">
                 <CheckCircle2 size={18} />
                 Thanks! You're subscribed.
               </div>
@@ -742,9 +742,9 @@ export const Marketplace: React.FC = () => {
 
       {/* ── Order success toast ── */}
       {orderNumber && (
-        <div className="fixed bottom-5 left-1/2 z-[70] w-[calc(100%-32px)] max-w-md -translate-x-1/2 border border-emerald-200 bg-white p-4 shadow-2xl">
+        <div className="fixed bottom-5 left-1/2 z-[70] w-[calc(100%-32px)] max-w-md -translate-x-1/2 border border-accent/20 bg-white p-4 shadow-2xl">
           <div className="flex gap-3">
-            <CheckCircle2 className="shrink-0 text-emerald-600" size={24} />
+            <CheckCircle2 className="shrink-0 text-accent" size={24} />
             <div className="min-w-0">
               <p className="font-black text-[#1c1c1c]">Order placed: {orderNumber}</p>
               <p className="mt-1 text-xs leading-5 text-[#777]">Your checkout created an order and cleared the cart.</p>

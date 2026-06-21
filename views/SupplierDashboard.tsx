@@ -408,7 +408,7 @@ export const SupplierDashboard: React.FC = () => {
                       )}
 
                       {['shipped', 'delivered'].includes(o.status) && (
-                        <div className="bg-emerald-50 text-emerald-800 text-xs p-3 border border-emerald-100 text-center font-extrabold">
+                        <div className="bg-accent-light text-accent-dark text-xs p-3 border border-accent/10 text-center font-extrabold">
                           ✅ Order Dispatched & Funds Released!
                         </div>
                       )}

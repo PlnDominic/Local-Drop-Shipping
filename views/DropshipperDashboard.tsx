@@ -103,12 +103,12 @@ export const DropshipperDashboard: React.FC = () => {
       {/* Sidebar Panel */}
       <aside className="w-full md:w-64 bg-white p-6 border border-gray-100 shadow-sm h-fit space-y-6">
         <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-          <div className="w-10 h-10 bg-emerald-500 flex items-center justify-center text-white font-bold">
+          <div className="w-10 h-10 bg-accent flex items-center justify-center text-white font-bold">
             K
           </div>
           <div>
             <h4 className="font-extrabold text-neutral-dark text-sm">Kofi Owusu</h4>
-            <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 font-bold">Dropshipper Pro</span>
+            <span className="text-[10px] text-accent bg-accent-light px-2 py-0.5 font-bold">Dropshipper Pro</span>
           </div>
         </div>
 
@@ -208,8 +208,8 @@ export const DropshipperDashboard: React.FC = () => {
               </div>
 
               <div className="bg-white p-5 border border-gray-100 shadow-sm flex flex-col justify-between h-32">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider text-emerald-600">Commissions Settled</span>
-                <h3 className="text-2xl font-black text-emerald-600">₵{totalCommissions.toFixed(2)}</h3>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider text-accent">Commissions Settled</span>
+                <h3 className="text-2xl font-black text-accent">₵{totalCommissions.toFixed(2)}</h3>
                 <span className="text-[10px] text-neutral-gray">Net margins credited</span>
               </div>
 
@@ -348,7 +348,7 @@ export const DropshipperDashboard: React.FC = () => {
                 </div>
 
                 {markupPrice > selectedProduct.costPrice && (
-                  <div className="bg-emerald-50 p-3 border border-emerald-100 flex justify-between text-xs text-emerald-800">
+                  <div className="bg-accent-light p-3 border border-accent/10 flex justify-between text-xs text-accent-dark">
                     <span>Your net profit margin per sale:</span>
                     <strong className="font-black">₵{(markupPrice - selectedProduct.costPrice).toFixed(2)}</strong>
                   </div>
@@ -415,7 +415,7 @@ export const DropshipperDashboard: React.FC = () => {
                               />
                             </div>
                           </td>
-                          <td className="p-4 text-emerald-600 font-black">
+                          <td className="p-4 text-accent font-black">
                             ₵{(dp.sellingPrice - dp.product.costPrice).toFixed(2)}
                           </td>
                           <td className="p-4">
@@ -423,7 +423,7 @@ export const DropshipperDashboard: React.FC = () => {
                               onClick={() => togglePublishProduct(dp.id)}
                               className={`px-2.5 py-1 text-[9px] font-black border uppercase tracking-wider ${
                                 dp.isPublished 
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                  ? 'bg-accent-light text-accent-dark border-accent/20' 
                                   : 'bg-yellow-50 text-yellow-700 border-yellow-200'
                               }`}
                             >
@@ -490,10 +490,10 @@ export const DropshipperDashboard: React.FC = () => {
                             {o.items.map(item => `${item.productName} (x${item.quantity})`).join(', ')}
                           </td>
                           <td className="p-4 font-semibold">₵{o.totalAmount.toFixed(2)}</td>
-                          <td className="p-4 font-black text-emerald-600">₵{o.profitAmount.toFixed(2)}</td>
+                          <td className="p-4 font-black text-accent">₵{o.profitAmount.toFixed(2)}</td>
                           <td className="p-4">
                             <span className={`px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${
-                              o.status === 'delivered' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                              o.status === 'delivered' ? 'bg-accent-light text-accent-dark border border-accent/20' :
                               o.status === 'shipped' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                               o.status === 'processing' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
                               'bg-yellow-50 text-yellow-700 border border-yellow-200'
@@ -533,7 +533,7 @@ export const DropshipperDashboard: React.FC = () => {
                   )}
 
                   {withdrawSuccess && (
-                    <div className="bg-emerald-50 text-emerald-700 text-xs p-3 border border-emerald-100 flex items-center gap-1.5">
+                    <div className="bg-accent-light text-accent-dark text-xs p-3 border border-accent/10 flex items-center gap-1.5">
                       <CheckCircle2 size={14} />
                       <span>Withdrawal processed! Check your phone's SMS logs.</span>
                     </div>
@@ -607,7 +607,7 @@ export const DropshipperDashboard: React.FC = () => {
                           <strong className="block font-bold text-neutral-dark">{tx.description}</strong>
                           <span className="text-[10px] text-gray-400">{tx.reference} · {new Date(tx.createdAt).toLocaleTimeString()}</span>
                         </div>
-                        <strong className={`font-extrabold ${tx.type === 'withdrawal' || tx.type === 'debit' ? 'text-red-500' : 'text-emerald-600'}`}>
+                        <strong className={`font-extrabold ${tx.type === 'withdrawal' || tx.type === 'debit' ? 'text-red-500' : 'text-accent'}`}>
                           {tx.type === 'withdrawal' || tx.type === 'debit' ? '-' : '+'}₵{tx.amount.toFixed(2)}
                         </strong>
                       </div>
@@ -618,7 +618,7 @@ export const DropshipperDashboard: React.FC = () => {
             </div>
 
             <div className="space-y-6">
-              <div className="bg-[#e6f3ec]/60 border border-primary/10 p-5 space-y-4 text-xs">
+              <div className="bg-accent-light/60 border border-primary/10 p-5 space-y-4 text-xs">
                 <h4 className="font-black text-primary flex items-center gap-1">
                   <Wallet size={15} />
                   Wallet Analytics
