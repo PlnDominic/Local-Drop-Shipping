@@ -19,11 +19,13 @@ import {
   SlidersHorizontal,
   Sparkles,
   Star,
+  Tag,
   User,
   X
 } from 'lucide-react';
 import { useGlobalStore } from '../store/globalStore';
-import type { DropshipperProduct } from '../store/globalStore';
+import type { DropshipperProduct, ProductReview } from '../store/globalStore';
+import { useToast } from '../components/Toast';
 
 const heroImage =
   'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=90';
@@ -45,55 +47,209 @@ const getCategoryLabel = (categoryId: string) => {
   }
 };
 
+const computeAvgRating = (reviews: ProductReview[]): number => {
+  if (!reviews || reviews.length === 0) return 0;
+  return reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+};
+
+const StarDisplay: React.FC<{ rating: number; size?: number }> = ({ rating, size = 13 }) => {
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star
+          key={n}
+          size={size}
+          fill={n <= Math.round(rating) ? '#f5a524' : 'none'}
+          stroke={n <= Math.round(rating) ? '#f5a524' : '#ccc'}
+          strokeWidth={1.5}
+        />
+      ))}
+    </span>
+  );
+};
+
+// ── Skeleton loader ──
+const SkeletonCard: React.FC = () => (
+  <div className="min-w-0 animate-pulse">
+    <div className="aspect-[1/0.92] bg-gray-200" />
+    <div className="pt-3 space-y-2">
+      <div className="h-5 bg-gray-200 rounded w-3/4" />
+      <div className="h-4 bg-gray-200 rounded w-1/2" />
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="h-9 bg-gray-200 rounded" />
+        <div className="h-9 bg-gray-200 rounded" />
+      </div>
+    </div>
+  </div>
+);
+
+// ── Product Detail Modal ──
+const ProductModal: React.FC<{
+  product: DropshipperProduct;
+  onClose: () => void;
+  onAddToCart: (id: string) => void;
+  onBuyNow: (id: string) => void;
+}> = ({ product, onClose, onAddToCart, onBuyNow }) => {
+  const reviews = product.product.reviews || [];
+  const avgRating = computeAvgRating(reviews);
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="relative w-full max-w-2xl bg-white shadow-2xl max-h-[90vh] overflow-y-auto">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center border border-gray-200 bg-white hover:bg-gray-50"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="grid md:grid-cols-2">
+          {/* Image */}
+          <div className="bg-[#f2f2f2] aspect-square flex items-center justify-center p-8">
+            <img
+              src={product.product.images[0]}
+              alt={product.product.name}
+              className="h-full w-full object-contain mix-blend-multiply"
+            />
+          </div>
+
+          {/* Info */}
+          <div className="p-6 flex flex-col gap-4">
+            <div>
+              <span className="text-[10px] font-black text-[#777] uppercase tracking-wider">
+                {getCategoryLabel(product.product.categoryId)}
+              </span>
+              <h2 className="mt-1 text-[20px] font-black leading-tight text-[#151515]">
+                {product.product.name}
+              </h2>
+              <p className="mt-1 text-xs text-[#777]">By {product.product.supplierName}</p>
+            </div>
+
+            <p className="text-sm leading-relaxed text-[#444]">{product.customDescription}</p>
+
+            <div className="flex items-center gap-3">
+              <StarDisplay rating={avgRating} size={16} />
+              <span className="text-xs font-bold text-[#777]">
+                {avgRating.toFixed(1)} ({reviews.length} review{reviews.length !== 1 ? 's' : ''})
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <strong className="text-2xl font-black text-[#151515]">{formatMoney(product.sellingPrice)}</strong>
+              <span className="text-xs text-[#777]">{product.product.stockQty} in stock</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { onAddToCart(product.id); onClose(); }}
+                className="h-10 border border-[#dedede] bg-white px-3 text-[11px] font-black text-[#151515] transition-colors hover:border-[#191919]"
+              >
+                Add to Cart
+              </button>
+              <button
+                type="button"
+                onClick={() => { onBuyNow(product.id); onClose(); }}
+                className="h-10 border border-[#191919] bg-[#191919] px-3 text-[11px] font-black text-white transition-colors hover:bg-black"
+              >
+                Buy Now
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Reviews section */}
+        {reviews.length > 0 && (
+          <div className="border-t border-[#ededed] p-6">
+            <h3 className="mb-4 text-[15px] font-black text-[#151515]">Customer Reviews</h3>
+            <div className="space-y-4">
+              {reviews.map((review) => (
+                <div key={review.id} className="border-b border-[#f0f0f0] pb-4 last:border-0 last:pb-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <StarDisplay rating={review.rating} size={12} />
+                      <span className="text-[12px] font-black text-[#151515]">{review.author}</span>
+                    </div>
+                    <span className="text-[10px] text-[#aaa]">{review.date}</span>
+                  </div>
+                  <p className="mt-1.5 text-[12px] leading-relaxed text-[#555]">{review.comment}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ProductCard: React.FC<{
   product: DropshipperProduct;
   compact?: boolean;
   onAddToCart: (id: string) => void;
   onBuyNow: (id: string) => void;
-}> = ({ product, compact = false, onAddToCart, onBuyNow }) => (
-  <article className="min-w-0">
-    <div className={`relative overflow-hidden bg-[#f2f2f2] ${compact ? 'aspect-[1.55/1]' : 'aspect-[1/0.92]'}`}>
-      <span className="absolute right-2.5 top-2.5 z-10 grid min-w-[58px] place-items-center border border-[#d8d8d8] bg-white/95 px-3 py-1 text-[11px] font-black text-[#222] shadow-sm">
-        {getCategoryLabel(product.product.categoryId)}
-      </span>
-      <img
-        src={product.product.images[0]}
-        alt={product.product.name}
-        className="h-full w-full object-contain p-6 mix-blend-multiply transition-transform duration-500 hover:scale-105"
-      />
-    </div>
-    <div className="pt-3">
-      <h3 className="line-clamp-1 text-[19px] font-black leading-tight tracking-normal text-[#151515]">
-        {product.product.name}
-      </h3>
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-[#777]">
-          <Star size={13} fill="#f5a524" strokeWidth={0} />
-          4.8 (1.2k Reviews)
+  onOpenDetail: (product: DropshipperProduct) => void;
+}> = ({ product, compact = false, onAddToCart, onBuyNow, onOpenDetail }) => {
+  const reviews = product.product.reviews || [];
+  const avgRating = computeAvgRating(reviews);
+
+  return (
+    <article className="min-w-0">
+      <div
+        className={`relative overflow-hidden bg-[#f2f2f2] ${compact ? 'aspect-[1.55/1]' : 'aspect-[1/0.92]'} cursor-pointer`}
+        onClick={() => onOpenDetail(product)}
+      >
+        <span className="absolute right-2.5 top-2.5 z-10 grid min-w-[58px] place-items-center border border-[#d8d8d8] bg-white/95 px-3 py-1 text-[11px] font-black text-[#222] shadow-sm">
+          {getCategoryLabel(product.product.categoryId)}
         </span>
-        <strong className="whitespace-nowrap text-[18px] font-black text-[#151515]">
-          {formatMoney(product.sellingPrice)}
-        </strong>
+        <img
+          src={product.product.images[0]}
+          alt={product.product.name}
+          className="h-full w-full object-contain p-6 mix-blend-multiply transition-transform duration-500 hover:scale-105"
+        />
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={() => onAddToCart(product.id)}
-          className="h-9 border border-[#dedede] bg-white px-3 text-[11px] font-black text-[#151515] transition-colors hover:border-[#191919]"
+      <div className="pt-3">
+        <h3
+          className="line-clamp-1 text-[19px] font-black leading-tight tracking-normal text-[#151515] cursor-pointer hover:underline"
+          onClick={() => onOpenDetail(product)}
         >
-          Add to Chart
-        </button>
-        <button
-          type="button"
-          onClick={() => onBuyNow(product.id)}
-          className="h-9 border border-[#191919] bg-[#191919] px-3 text-[11px] font-black text-white transition-colors hover:bg-black"
-        >
-          Buy Now
-        </button>
+          {product.product.name}
+        </h3>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-[#777]">
+            <StarDisplay rating={avgRating} />
+            {avgRating.toFixed(1)} ({reviews.length})
+          </span>
+          <strong className="whitespace-nowrap text-[18px] font-black text-[#151515]">
+            {formatMoney(product.sellingPrice)}
+          </strong>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onAddToCart(product.id)}
+            className="h-9 border border-[#dedede] bg-white px-3 text-[11px] font-black text-[#151515] transition-colors hover:border-[#191919]"
+          >
+            Add to Cart
+          </button>
+          <button
+            type="button"
+            onClick={() => onBuyNow(product.id)}
+            className="h-9 border border-[#191919] bg-[#191919] px-3 text-[11px] font-black text-white transition-colors hover:bg-black"
+          >
+            Buy Now
+          </button>
+        </div>
       </div>
-    </div>
-  </article>
-);
+    </article>
+  );
+};
 
 export const Marketplace: React.FC = () => {
   const {
@@ -102,8 +258,13 @@ export const Marketplace: React.FC = () => {
     addToCart,
     removeFromCart,
     updateCartQuantity,
-    submitCheckout
+    submitCheckout,
+    appliedPromo,
+    applyPromoCode,
+    clearPromo
   } = useGlobalStore();
+
+  const { showToast } = useToast();
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
@@ -114,9 +275,21 @@ export const Marketplace: React.FC = () => {
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [emailSubmitted, setEmailSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [detailProduct, setDetailProduct] = useState<DropshipperProduct | null>(null);
+
+  // Promo code state
+  const [promoInput, setPromoInput] = useState('');
+  const [promoError, setPromoError] = useState('');
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const recsRef = useRef<HTMLDivElement>(null);
+
+  // 1-second skeleton on mount
+  useEffect(() => {
+    const t = setTimeout(() => setIsLoading(false), 1000);
+    return () => clearTimeout(t);
+  }, []);
 
   // Reset to page 1 whenever filters change
   useEffect(() => { setCurrentPage(1); }, [activeCategory, sortMode, query]);
@@ -152,7 +325,6 @@ export const Marketplace: React.FC = () => {
           (a.product.suggestedPrice - a.sellingPrice)
       );
     }
-    // 'new' keeps insertion order (already newest-first in the mock)
 
     return result;
   }, [activeCategory, catalogProducts, query, sortMode]);
@@ -181,10 +353,26 @@ export const Marketplace: React.FC = () => {
   const cartCount = cartLines.reduce((sum, l) => sum + l.quantity, 0);
   const cartSubtotal = cartLines.reduce((sum, l) => sum + l.item.sellingPrice * l.quantity, 0);
   const deliveryFee = cartSubtotal > 0 ? 25 : 0;
-  const cartTotal = cartSubtotal + deliveryFee;
+  const promoDiscount = appliedPromo ? cartSubtotal * appliedPromo.discount : 0;
+  const cartTotal = cartSubtotal + deliveryFee - promoDiscount;
 
-  const handleAddToCart = (id: string) => { addToCart(id); setCartOpen(true); };
+  const handleAddToCart = (id: string) => {
+    addToCart(id);
+    setCartOpen(true);
+    showToast('Added to cart!', 'success');
+  };
   const handleBuyNow = (id: string) => { addToCart(id); setCartOpen(true); setCheckoutOpen(true); };
+
+  const handleApplyPromo = () => {
+    setPromoError('');
+    const success = applyPromoCode(promoInput.trim());
+    if (success) {
+      showToast('Promo code applied!', 'success');
+    } else {
+      setPromoError('Invalid promo code');
+      showToast('Invalid promo code', 'error');
+    }
+  };
 
   const handleCheckout = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -203,6 +391,9 @@ export const Marketplace: React.FC = () => {
       setOrderNumber(result.orderNumber);
       setCheckoutOpen(false);
       setCartOpen(false);
+      clearPromo();
+      setPromoInput('');
+      showToast('Order placed successfully!', 'success');
     }
   };
 
@@ -416,7 +607,11 @@ export const Marketplace: React.FC = () => {
 
             {/* ── Product grid ── */}
             <div>
-              {pagedProducts.length > 0 ? (
+              {isLoading ? (
+                <div className="grid grid-cols-3 gap-x-7 gap-y-10 max-lg:grid-cols-2 max-sm:grid-cols-1">
+                  {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+                </div>
+              ) : pagedProducts.length > 0 ? (
                 <div className="grid grid-cols-3 gap-x-7 gap-y-10 max-lg:grid-cols-2 max-sm:grid-cols-1">
                   {pagedProducts.map((product, index) => (
                     <ProductCard
@@ -424,55 +619,66 @@ export const Marketplace: React.FC = () => {
                       product={product}
                       onAddToCart={handleAddToCart}
                       onBuyNow={handleBuyNow}
+                      onOpenDetail={setDetailProduct}
                     />
                   ))}
                 </div>
               ) : (
-                <div className="border border-dashed border-[#d8d8d8] p-10 text-center">
-                  <p className="font-black">No products match your search.</p>
-                  <p className="mt-2 text-sm text-[#777]">Try another category or search term.</p>
+                <div className="flex flex-col items-center justify-center border border-dashed border-[#d8d8d8] p-16 text-center">
+                  <Search size={40} className="text-[#d8d8d8] mb-4" />
+                  <p className="font-black text-[#151515] text-lg">No products found</p>
+                  <p className="mt-2 text-sm text-[#777]">Try a different category or search term.</p>
+                  <button
+                    type="button"
+                    onClick={() => { setActiveCategory('all'); setQuery(''); setSortMode('default'); }}
+                    className="mt-5 h-10 border border-[#191919] bg-[#191919] px-6 text-[11px] font-black text-white transition-colors hover:bg-black"
+                  >
+                    Clear filters
+                  </button>
                 </div>
               )}
 
               {/* ── Pagination ── */}
-              <div className="flex items-center justify-between gap-5 py-16 text-[11px] font-black">
-                <button
-                  type="button"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="inline-flex items-center gap-2 disabled:opacity-30 hover:opacity-70 transition-opacity"
-                >
-                  <ArrowLeft size={14} />
-                  Previous
-                </button>
-                <div className="flex items-center gap-3">
-                  {pageNumbers.map((page, i) =>
-                    page === '...' ? (
-                      <span key={`ellipsis-${i}`} className="select-none">...</span>
-                    ) : (
-                      <button
-                        key={page}
-                        type="button"
-                        onClick={() => setCurrentPage(page as number)}
-                        className={`grid h-8 w-8 place-items-center transition-colors ${
-                          currentPage === page ? 'bg-[#191919] text-white' : 'bg-[#f0f0f0] hover:bg-[#e0e0e0]'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    )
-                  )}
+              {!isLoading && (
+                <div className="flex items-center justify-between gap-5 py-16 text-[11px] font-black">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex items-center gap-2 disabled:opacity-30 hover:opacity-70 transition-opacity"
+                  >
+                    <ArrowLeft size={14} />
+                    Previous
+                  </button>
+                  <div className="flex items-center gap-3">
+                    {pageNumbers.map((page, i) =>
+                      page === '...' ? (
+                        <span key={`ellipsis-${i}`} className="select-none">...</span>
+                      ) : (
+                        <button
+                          key={page}
+                          type="button"
+                          onClick={() => setCurrentPage(page as number)}
+                          className={`grid h-8 w-8 place-items-center transition-colors ${
+                            currentPage === page ? 'bg-[#191919] text-white' : 'bg-[#f0f0f0] hover:bg-[#e0e0e0]'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    className="inline-flex items-center gap-2 disabled:opacity-30 hover:opacity-70 transition-opacity"
+                  >
+                    Next
+                    <ArrowRight size={14} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="inline-flex items-center gap-2 disabled:opacity-30 hover:opacity-70 transition-opacity"
-                >
-                  Next
-                  <ArrowRight size={14} />
-                </button>
-              </div>
+              )}
             </div>
           </div>
         </section>
@@ -512,6 +718,7 @@ export const Marketplace: React.FC = () => {
                 compact
                 onAddToCart={handleAddToCart}
                 onBuyNow={handleBuyNow}
+                onOpenDetail={setDetailProduct}
               />
             ))}
           </div>
@@ -611,6 +818,16 @@ export const Marketplace: React.FC = () => {
         </div>
       </section>
 
+      {/* ── Product Detail Modal ── */}
+      {detailProduct && (
+        <ProductModal
+          product={detailProduct}
+          onClose={() => setDetailProduct(null)}
+          onAddToCart={handleAddToCart}
+          onBuyNow={handleBuyNow}
+        />
+      )}
+
       {/* ── Cart drawer ── */}
       {cartOpen && (
         <div className="fixed inset-0 z-50 bg-black/40" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) setCartOpen(false); }}>
@@ -672,6 +889,11 @@ export const Marketplace: React.FC = () => {
                 <div className="flex justify-between text-[#777]">
                   <span>Delivery</span><span>{formatMoney(deliveryFee)}</span>
                 </div>
+                {promoDiscount > 0 && (
+                  <div className="flex justify-between text-[#f04438]">
+                    <span>Promo ({appliedPromo?.code})</span><span>-{formatMoney(promoDiscount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between border-t border-gray-200 pt-3 text-lg font-black">
                   <span>Total</span><span>{formatMoney(cartTotal)}</span>
                 </div>
@@ -693,7 +915,7 @@ export const Marketplace: React.FC = () => {
       {/* ── Checkout modal ── */}
       {checkoutOpen && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4" role="dialog" aria-modal="true">
-          <form onSubmit={handleCheckout} className="w-full max-w-lg bg-white p-5 shadow-2xl">
+          <form onSubmit={handleCheckout} className="w-full max-w-lg bg-white p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-black">Checkout</h2>
@@ -702,6 +924,44 @@ export const Marketplace: React.FC = () => {
               <button type="button" onClick={() => setCheckoutOpen(false)} className="grid h-9 w-9 place-items-center border border-gray-200 hover:bg-gray-50">
                 <X size={18} />
               </button>
+            </div>
+
+            {/* Promo code field */}
+            <div className="mb-4">
+              <label className="block text-xs font-black text-[#777] mb-1">Promo Code</label>
+              {appliedPromo ? (
+                <div className="flex items-center justify-between h-11 border border-[#f04438]/30 bg-[#fff5f5] px-4">
+                  <span className="text-sm font-black text-[#f04438] flex items-center gap-2">
+                    <Tag size={14} />
+                    {appliedPromo.code} — {Math.round(appliedPromo.discount * 100)}% off applied!
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { clearPromo(); setPromoInput(''); setPromoError(''); }}
+                    className="text-gray-400 hover:text-[#f04438]"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={promoInput}
+                    onChange={(e) => { setPromoInput(e.target.value); setPromoError(''); }}
+                    placeholder="e.g. GHANA20"
+                    className="flex-1 h-11 border border-gray-200 px-4 text-sm text-[#1c1c1c] outline-none focus:border-[#191919] uppercase"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyPromo}
+                    className="h-11 border border-[#191919] bg-[#191919] px-4 text-[11px] font-black text-white hover:bg-black transition-colors"
+                  >
+                    Apply
+                  </button>
+                </div>
+              )}
+              {promoError && <p className="mt-1 text-xs text-[#f04438]">{promoError}</p>}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -725,8 +985,19 @@ export const Marketplace: React.FC = () => {
               <textarea name="notes" rows={3} className="border border-gray-200 px-4 py-3 text-sm text-[#1c1c1c] outline-none focus:border-[#191919]" />
             </label>
 
-            <div className="mt-5 bg-gray-50 p-4">
-              <div className="flex justify-between text-sm font-bold">
+            <div className="mt-5 bg-gray-50 p-4 space-y-1">
+              <div className="flex justify-between text-sm text-[#777]">
+                <span>Subtotal</span><span>{formatMoney(cartSubtotal)}</span>
+              </div>
+              <div className="flex justify-between text-sm text-[#777]">
+                <span>Delivery</span><span>{formatMoney(deliveryFee)}</span>
+              </div>
+              {promoDiscount > 0 && (
+                <div className="flex justify-between text-sm text-[#f04438]">
+                  <span>Promo ({appliedPromo?.code})</span><span>-{formatMoney(promoDiscount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-black border-t border-gray-200 pt-2">
                 <span>Total payable</span><span>{formatMoney(cartTotal)}</span>
               </div>
               <p className="mt-1 text-xs text-[#777]">Payment provider: MTN MoMo demo</p>

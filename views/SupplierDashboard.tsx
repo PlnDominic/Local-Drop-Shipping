@@ -1,11 +1,12 @@
 ﻿import React, { useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
-import { 
-  Plus, 
-  Truck, 
-  Package, 
-  AlertCircle, 
-  Check
+import {
+  Plus,
+  Truck,
+  Package,
+  AlertCircle,
+  Check,
+  Menu
 } from 'lucide-react';
 
 export const SupplierDashboard: React.FC = () => {
@@ -21,6 +22,7 @@ export const SupplierDashboard: React.FC = () => {
   } = useGlobalStore();
 
   const [activeTab, setActiveTab] = useState<'products' | 'upload' | 'orders'>('products');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // New Product form state
   const [name, setName] = useState('');
@@ -72,10 +74,29 @@ export const SupplierDashboard: React.FC = () => {
     }
   };
 
+  const handleTabChange = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    setSidebarOpen(false);
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 min-h-screen flex flex-col md:flex-row gap-8 font-sans animate-fade-in">
+    <div className="max-w-7xl mx-auto px-4 py-8 min-h-screen font-sans animate-fade-in">
+      {/* Mobile hamburger */}
+      <div className="flex items-center gap-3 mb-4 md:hidden">
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(v => !v)}
+          className="flex items-center gap-2 border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-[#151515]"
+        >
+          <Menu size={16} />
+          <span>Menu</span>
+        </button>
+        <span className="text-sm font-black text-[#151515] capitalize">{activeTab.replace('-', ' ')}</span>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-8">
       {/* Sidebar Panel */}
-      <aside className="w-full md:w-64 bg-white p-6 border border-gray-100 shadow-sm h-fit space-y-6">
+      <aside className={`w-full md:w-64 bg-white p-6 border border-gray-100 shadow-sm h-fit space-y-6 ${sidebarOpen ? 'block' : 'hidden md:block'}`}>
         <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
           <div className="w-10 h-10 bg-purple-500 flex items-center justify-center text-white font-bold">
             KT
@@ -88,7 +109,7 @@ export const SupplierDashboard: React.FC = () => {
 
         <nav className="flex flex-col gap-1.5">
           <button
-            onClick={() => setActiveTab('products')}
+            onClick={() => handleTabChange('products')}
             className={`flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold transition-colors ${
               activeTab === 'products' ? 'bg-primary text-white' : 'text-neutral-gray hover:bg-gray-50 hover:text-neutral-dark'
             }`}
@@ -96,9 +117,9 @@ export const SupplierDashboard: React.FC = () => {
             <Package size={16} />
             <span>Listed Products ({supplierProducts.length})</span>
           </button>
-          
+
           <button
-            onClick={() => setActiveTab('upload')}
+            onClick={() => handleTabChange('upload')}
             className={`flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold transition-colors ${
               activeTab === 'upload' ? 'bg-primary text-white' : 'text-neutral-gray hover:bg-gray-50 hover:text-neutral-dark'
             }`}
@@ -108,7 +129,7 @@ export const SupplierDashboard: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('orders')}
+            onClick={() => handleTabChange('orders')}
             className={`flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold transition-colors ${
               activeTab === 'orders' ? 'bg-primary text-white' : 'text-neutral-gray hover:bg-gray-50 hover:text-neutral-dark'
             }`}
@@ -421,6 +442,7 @@ export const SupplierDashboard: React.FC = () => {
         )}
 
       </main>
+      </div>
     </div>
   );
 };

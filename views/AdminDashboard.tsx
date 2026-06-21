@@ -45,7 +45,7 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-5 border border-gray-100 shadow-sm flex flex-col justify-between h-32">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Gross Platform GMV</span>
           <h3 className="text-2xl font-black text-neutral-dark">₵{totalSales.toFixed(2)}</h3>

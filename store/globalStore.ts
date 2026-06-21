@@ -37,6 +37,14 @@ export interface Category {
   icon: string;
 }
 
+export interface ProductReview {
+  id: string;
+  author: string;
+  rating: number; // 1-5
+  comment: string;
+  date: string;
+}
+
 export interface Product {
   id: string;
   supplierId: string;
@@ -51,6 +59,7 @@ export interface Product {
   sku: string;
   isActive: boolean;
   createdAt: string;
+  reviews: ProductReview[];
 }
 
 export interface DropshipperProduct {
@@ -139,6 +148,12 @@ interface AppState {
   setActiveRole: (role: UserRole) => void;
   mobilePreview: boolean;
   setMobilePreview: (active: boolean) => void;
+
+  // Promo Codes
+  promoCodes: Record<string, number>;
+  appliedPromo: { code: string; discount: number } | null;
+  applyPromoCode: (code: string) => boolean;
+  clearPromo: () => void;
   
   // Database Tables
   users: User[];
@@ -298,7 +313,13 @@ const mockProducts: Product[] = [
     stockQty: 45,
     sku: 'KTK-TV-43',
     isActive: true,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    reviews: [
+      { id: 'r-1-1', author: 'Kwame Asante', rating: 5, comment: 'Chale, this TV is fire! Picture quality is clear like cinema. DSTV loaded fine and the sound is loud enough for the compound.', date: '2024-11-15' },
+      { id: 'r-1-2', author: 'Abena Osei', rating: 4, comment: 'Very good TV for the price. Delivery was fast via GhanaPost. Only small thing is the remote could feel more premium.', date: '2024-12-02' },
+      { id: 'r-1-3', author: 'Yaw Darko', rating: 5, comment: 'Made in Ghana product that actually works! Netflix streams smoothly even on my router. Proud to support local.', date: '2025-01-08' },
+      { id: 'r-1-4', author: 'Efua Mensah', rating: 4, comment: 'Bought it for the living room. Family loves it. 4K is really sharp. Setup was easy with the instructions.', date: '2025-02-14' }
+    ]
   },
   {
     id: 'p-2',
@@ -313,7 +334,14 @@ const mockProducts: Product[] = [
     stockQty: 150,
     sku: 'KTK-PB-20K',
     isActive: true,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    reviews: [
+      { id: 'r-2-1', author: 'Ama Boateng', rating: 5, comment: 'This power bank saved me during the last dumsor! Charged my phone 4 times before running out. The solar feature actually works.', date: '2024-10-22' },
+      { id: 'r-2-2', author: 'Kofi Adjei', rating: 4, comment: 'Very solid build, not cheap at all. Takes a while to fully charge itself but once charged it lasts days.', date: '2024-11-30' },
+      { id: 'r-2-3', author: 'Adwoa Frimpong', rating: 5, comment: 'Perfect for my trips to Kumasi. Two USB ports charged my phone and tablet at the same time. No heating issues.', date: '2025-01-20' },
+      { id: 'r-2-4', author: 'Nana Owusu', rating: 3, comment: 'Good product but the solar charging is slow. Still does the job for backup power. Would buy again.', date: '2025-03-05' },
+      { id: 'r-2-5', author: 'Akosua Asare', rating: 5, comment: 'Bought for my market stall. Keeps my POS machine running all day. Really durable, fell once and no damage.', date: '2025-04-10' }
+    ]
   },
   {
     id: 'p-3',
@@ -328,7 +356,12 @@ const mockProducts: Product[] = [
     stockQty: 30,
     sku: 'AFD-KNT-JKT',
     isActive: true,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    reviews: [
+      { id: 'r-3-1', author: 'Akwasi Mensah', rating: 5, comment: 'I wore this to the office on casual Friday and received so many compliments. The Kente pattern is authentic and beautifully done.', date: '2024-09-14' },
+      { id: 'r-3-2', author: 'Serwa Boateng', rating: 4, comment: 'Quality is very nice. The fleece is warm but not too heavy. Fits true to size. Great representation of Ghanaian culture.', date: '2024-10-05' },
+      { id: 'r-3-3', author: 'Kofi Asante', rating: 5, comment: 'Bought this for my graduation trip to London. Everyone there was asking where I got it from. Proud Ghanaian fashion!', date: '2025-02-28' }
+    ]
   },
   {
     id: 'p-4',
@@ -343,7 +376,13 @@ const mockProducts: Product[] = [
     stockQty: 80,
     sku: 'KTK-MOR-PES',
     isActive: true,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    reviews: [
+      { id: 'r-4-1', author: 'Adwoa Owusu', rating: 5, comment: 'The best mortar and pestle I have used! Really heavy and sturdy. My banku and fufu comes out perfect now. Traditional quality!', date: '2024-08-20' },
+      { id: 'r-4-2', author: 'Kweku Darko', rating: 4, comment: 'Great product. The wood is solid and well-carved. Bought it as a gift for my mother and she loves it.', date: '2024-11-12' },
+      { id: 'r-4-3', author: 'Abena Asante', rating: 5, comment: 'Finally a local product done right. Crushes spices perfectly and the smell of the Sesese wood adds flavor. Will order more.', date: '2025-01-18' },
+      { id: 'r-4-4', author: 'Yaa Boateng', rating: 4, comment: 'Very authentic and heavy. Good for serious pounding. Ships with padding so no damage. Happy with the purchase.', date: '2025-03-22' }
+    ]
   }
 ];
 
@@ -400,6 +439,20 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   setActiveRole: (role) => set({ activeRole: role }),
   mobilePreview: false,
   setMobilePreview: (active) => set({ mobilePreview: active }),
+
+  // Promo Codes
+  promoCodes: { 'LAUNCH10': 0.10, 'GHANA20': 0.20, 'WELCOME15': 0.15 },
+  appliedPromo: null,
+  applyPromoCode: (code) => {
+    const state = get();
+    const discount = state.promoCodes[code.toUpperCase()];
+    if (discount !== undefined) {
+      set({ appliedPromo: { code: code.toUpperCase(), discount } });
+      return true;
+    }
+    return false;
+  },
+  clearPromo: () => set({ appliedPromo: null }),
 
   users: mockUsers,
   supplierProfiles: mockSupplierProfiles,
