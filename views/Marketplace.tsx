@@ -1024,7 +1024,8 @@ export const Marketplace: React.FC = () => {
           <div>
             <h4 className="text-[13px] font-black mb-4 text-gray-200">Contact</h4>
             <div className="space-y-2 text-[12px] text-gray-400">
-              <p className="flex items-center gap-2"><Phone size={12} /> +233 244 123 456</p>
+              <p className="flex items-center gap-2"><Phone size={12} /> +233 55 660 9232</p>
+              <p className="flex items-center gap-2"><Phone size={12} /> +233 54 285 5399</p>
               <p className="flex items-center gap-2"><MapPin size={12} /> Accra, Ghana</p>
               <p className="flex items-center gap-2"><Truck size={12} /> Nationwide Delivery</p>
             </div>
