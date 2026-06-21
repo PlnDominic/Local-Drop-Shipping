@@ -53,7 +53,8 @@ export const SupplierDashboard: React.FC = () => {
       suggestedPrice: parseFloat(suggestedPrice) || 0,
       stockQty: parseInt(stockQty) || 0,
       sku: sku || `KTK-PROD-${Math.floor(1000 + Math.random() * 9000)}`,
-      isActive: true
+      isActive: true,
+      reviews: []
     });
 
     // Reset form

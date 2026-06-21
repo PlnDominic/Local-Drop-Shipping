@@ -7,13 +7,11 @@ module.exports = [
   {
     ignores: ['dist', '.next', 'next-env.d.ts'],
   },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  reactHooks.configs.flat.recommended,
   {
     files: ['**/*.{ts,tsx}'],
-    extends: [
-      js.configs.recommended,
-      ...tseslint.configs.recommended,
-      reactHooks.configs.flat.recommended,
-    ],
     languageOptions: {
       globals: globals.browser,
     },
