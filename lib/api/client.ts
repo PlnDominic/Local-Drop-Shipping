@@ -1,6 +1,6 @@
 import { ApiError, ApiResponse, AuthTokens } from './types';
 
-const BASE_URL = 'https://api.localdropshipping.gh.com/v1';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
 
 const TOKEN_KEY = 'ld_access_token';
 const REFRESH_KEY = 'ld_refresh_token';

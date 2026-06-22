@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ToastContainer } from '../components/Toast';
+import { AuthProvider } from '../lib/auth/AuthProvider';
 
 const heroImage = 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=90';
 
@@ -45,8 +46,10 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-neutral-light text-neutral-dark font-sans antialiased">
-        {children}
-        <ToastContainer />
+        <AuthProvider>
+          {children}
+          <ToastContainer />
+        </AuthProvider>
       </body>
     </html>
   );
