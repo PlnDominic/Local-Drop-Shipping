@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../lib/auth/AuthProvider';
 import { ArrowLeft, ArrowRight, CheckCircle2, ShoppingBag, TrendingUp, Truck } from 'lucide-react';
 
@@ -24,8 +24,9 @@ const GoogleIcon: React.FC = () => (
   </svg>
 );
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { session, signIn, signUp, signInWithGoogle } = useAuth();
 
   const [mode, setMode] = useState<Mode>('signin');
@@ -36,7 +37,11 @@ export default function LoginPage() {
   const [role, setRole] = useState<Role>('customer');
 
   const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
+  const [info, setInfo] = useState(
+    searchParams.get('msg') === 'confirm'
+      ? 'Account created! Check your email to confirm, then sign in.'
+      : '',
+  );
   const [submitting, setSubmitting] = useState(false);
 
   // Already signed in → leave the auth page.
@@ -239,5 +244,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="h-8 w-8 rounded-full border-4 border-[#f04438] border-t-transparent animate-spin" /></div>}>
+      <LoginPageInner />
+    </Suspense>
   );
 }
