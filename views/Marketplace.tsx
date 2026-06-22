@@ -1297,7 +1297,7 @@ export const Marketplace: React.FC = () => {
 
       {/* Click-away for account dropdown */}
       {accountOpen && (
-        <div className="fixed inset-0 z-40" onClick={() => setAccountOpen(false)} />
+        <div className="fixed inset-0 z-[29]" onClick={() => setAccountOpen(false)} />
       )}
     </main>
   );
