@@ -28,7 +28,7 @@ export const Navigation: React.FC = () => {
   const pathname = usePathname();
 
   const links: NavLink[] = [
-    { href: '/marketplace', label: 'Marketplace',        icon: ShoppingBag, desc: 'Browse & buy products via MoMo' },
+    { href: '/',            label: 'Marketplace',        icon: ShoppingBag, desc: 'Browse & buy products via MoMo' },
     { href: '/dropshipper', label: 'Start Dropshipping',  icon: TrendingUp,  desc: 'Import products, set markups, earn commissions' },
     { href: '/supplier',    label: 'Supplier Portal',     icon: Truck,       desc: 'List wholesale items, fulfill orders' },
     { href: '/admin',       label: 'Admin Panel',         icon: ShieldAlert, desc: 'Verify suppliers, platform analytics' },
@@ -78,7 +78,7 @@ export const Navigation: React.FC = () => {
               >
                 <Icon size={15} className={isActive ? 'text-primary' : 'text-gray-400'} />
                 <span>{r.label}</span>
-                {r.href === '/marketplace' && cartCount > 0 && (
+                {r.href === '/' && cartCount > 0 && (
                   <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 ml-0.5">
                     {cartCount}
                   </span>
