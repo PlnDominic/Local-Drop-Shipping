@@ -149,11 +149,6 @@ export const DropshipperRegister: React.FC = () => {
           <p className="text-gray-400 text-[13px] max-w-sm">
             Source products from verified Ghanaian suppliers, set your own prices, and get paid via MTN MoMo.
           </p>
-          <div className="grid grid-cols-3 gap-4 max-w-md pt-4 border-t border-white/10">
-            <div><p className="text-2xl font-black">1,200+</p><p className="text-[10px] text-gray-400">Suppliers</p></div>
-            <div><p className="text-2xl font-black">₵4.5M+</p><p className="text-[10px] text-gray-400">Paid out</p></div>
-            <div><p className="text-2xl font-black">99.2%</p><p className="text-[10px] text-gray-400">Delivery</p></div>
-          </div>
         </div>
 
         <Link href="/" className="relative flex items-center gap-1.5 text-[12px] font-bold text-gray-400 hover:text-white transition-colors w-fit">
