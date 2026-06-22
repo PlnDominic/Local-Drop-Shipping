@@ -2,8 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useGlobalStore } from '../store/globalStore';
+import { useAuth } from '../lib/auth/AuthProvider';
 import type { LucideIcon } from 'lucide-react';
 import {
   ShoppingBag,
@@ -13,7 +14,9 @@ import {
   Code,
   Bell,
   Wallet,
-  Smartphone
+  Smartphone,
+  LogIn,
+  LogOut
 } from 'lucide-react';
 
 interface NavLink {
@@ -25,7 +28,14 @@ interface NavLink {
 
 export const Navigation: React.FC = () => {
   const { cart, wallets, notifications, currentUserId } = useGlobalStore();
+  const { profile, signOut } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push('/');
+  };
 
   const links: NavLink[] = [
     { href: '/',            label: 'Marketplace',        icon: ShoppingBag, desc: 'Browse & buy products via MoMo' },
@@ -112,6 +122,30 @@ export const Navigation: React.FC = () => {
               )}
             </button>
           </div>
+
+          {profile ? (
+            <div className="flex items-center gap-1.5">
+              <span className="hidden sm:block text-[12px] font-bold text-neutral-dark max-w-[110px] truncate">
+                {profile.fullName?.split(' ')[0] || 'Account'}
+              </span>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                title="Sign out"
+                className="p-2 text-neutral-gray hover:text-accent hover:bg-gray-100 transition-colors"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="flex items-center gap-1.5 h-9 rounded bg-[#151515] px-3 text-[12px] font-black text-white hover:bg-[#f04438] transition-colors"
+            >
+              <LogIn size={14} />
+              <span className="hidden sm:inline">Sign In</span>
+            </Link>
+          )}
         </div>
 
       </div>

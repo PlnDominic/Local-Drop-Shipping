@@ -25,9 +25,12 @@ import {
   X,
   Zap
 } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useGlobalStore } from '../store/globalStore';
 import type { DropshipperProduct, ProductReview } from '../store/globalStore';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../lib/auth/AuthProvider';
 
 const heroImage =
   'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=90';
@@ -288,6 +291,14 @@ export const Marketplace: React.FC = () => {
   } = useGlobalStore();
 
   const { showToast } = useToast();
+  const { profile, signOut } = useAuth();
+  const router = useRouter();
+
+  const dashboardHref =
+    profile?.role === 'supplier' ? '/supplier'
+    : profile?.role === 'admin' ? '/admin'
+    : profile?.role === 'dropshipper' ? '/dropshipper'
+    : null;
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
@@ -519,22 +530,43 @@ export const Marketplace: React.FC = () => {
               </button>
               {accountOpen && (
                 <div className="absolute right-0 top-14 z-50 w-56 border border-[#ededed] bg-white shadow-lg rounded">
-                  <div className="border-b border-[#ededed] px-4 py-3">
-                    <p className="text-sm font-black text-[#151515]">Ama Mensah</p>
-                    <p className="text-[11px] text-[#777]">ama.mensah@gmail.com</p>
-                  </div>
-                  <div className="py-1">
-                    {['My Orders', 'Wishlist', 'Settings', 'Sign Out'].map((item) => (
-                      <button
-                        key={item}
-                        type="button"
+                  {profile ? (
+                    <>
+                      <div className="border-b border-[#ededed] px-4 py-3">
+                        <p className="text-sm font-black text-[#151515] truncate">{profile.fullName || 'Account'}</p>
+                        <p className="text-[11px] text-[#777] truncate">{profile.email}</p>
+                      </div>
+                      <div className="py-1">
+                        {dashboardHref && (
+                          <Link
+                            href={dashboardHref}
+                            onClick={() => setAccountOpen(false)}
+                            className="block w-full px-4 py-2 text-left text-[12px] font-semibold text-[#333] hover:bg-[#f5f5f5]"
+                          >
+                            My Dashboard
+                          </Link>
+                        )}
+                        <button
+                          type="button"
+                          onClick={async () => { setAccountOpen(false); await signOut(); router.push('/'); }}
+                          className="w-full px-4 py-2 text-left text-[12px] font-semibold text-[#f04438] hover:bg-[#f5f5f5]"
+                        >
+                          Sign Out
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-3 space-y-2">
+                      <p className="px-1 text-[11px] text-[#777]">Sign in to track orders and earn commissions.</p>
+                      <Link
+                        href="/login"
                         onClick={() => setAccountOpen(false)}
-                        className="w-full px-4 py-2 text-left text-[12px] font-semibold text-[#333] hover:bg-[#f5f5f5]"
+                        className="block h-9 rounded bg-[#151515] text-center text-[12px] font-black leading-9 text-white hover:bg-[#f04438] transition-colors"
                       >
-                        {item}
-                      </button>
-                    ))}
-                  </div>
+                        Sign In
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

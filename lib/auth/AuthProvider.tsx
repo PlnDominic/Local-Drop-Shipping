@@ -6,12 +6,21 @@ import { supabase } from '../supabase/client';
 import { mapUser, type UserRow } from '../supabase/types';
 import type { UserProfile } from '../api/types';
 
+interface SignUpParams {
+  email: string;
+  password: string;
+  fullName: string;
+  phone: string;
+  role: 'customer' | 'dropshipper' | 'supplier';
+}
+
 interface AuthContextValue {
   session: Session | null;
   /** The signed-in user's profile row (id, role, name, …) or null when logged out. */
   profile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (params: SignUpParams) => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -63,6 +72,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error?.message ?? null };
   };
 
+  const signUp: AuthContextValue['signUp'] = async ({ email, password, fullName, phone, role }) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      // Consumed by the public.handle_new_user() trigger to populate the profile row.
+      options: { data: { full_name: fullName, phone, role } },
+    });
+    // When email confirmation is enabled, a user exists but no session is created yet.
+    return { error: error?.message ?? null, needsConfirmation: !!data.user && !data.session };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
@@ -73,7 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
