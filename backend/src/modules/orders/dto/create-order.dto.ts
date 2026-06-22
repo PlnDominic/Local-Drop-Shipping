@@ -15,7 +15,9 @@ import { Type } from 'class-transformer';
 export class OrderItemDto {
   @IsUUID() productId: string = '';
   @IsInt() @Min(1) quantity: number = 1;
-  @IsNumber() @IsPositive() unitPrice: number = 0;
+  // Accepted for backward compatibility but IGNORED: the unit price is resolved
+  // server-side from dropshipper_products.custom_price to prevent price tampering.
+  @IsOptional() @IsNumber() @IsPositive() unitPrice?: number;
 }
 
 export class CreateOrderDto {

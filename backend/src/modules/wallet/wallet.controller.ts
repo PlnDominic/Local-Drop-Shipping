@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { WithdrawDto } from './dto/withdraw.dto';
 import { WalletService } from './wallet.service';
 
 @Controller('wallet')
@@ -23,11 +24,7 @@ export class WalletController {
   }
 
   @Post('withdraw')
-  withdraw(
-    @CurrentUser() user: JwtPayload,
-    @Body('amount') amount: number,
-    @Body('accountDetails') accountDetails: Record<string, string>,
-  ) {
-    return this.walletService.withdraw(user.sub, amount, accountDetails);
+  withdraw(@CurrentUser() user: JwtPayload, @Body() dto: WithdrawDto) {
+    return this.walletService.withdraw(user.sub, dto.amount, dto.accountDetails);
   }
 }

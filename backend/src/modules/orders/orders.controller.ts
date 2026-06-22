@@ -47,7 +47,11 @@ export class OrdersController {
   @Patch(':id/status')
   @UseGuards(RolesGuard)
   @Roles('admin', 'supplier')
-  updateStatus(@Param('id') id: string, @Body('status') status: OrderStatus) {
-    return this.ordersService.updateStatus(id, status);
+  updateStatus(
+    @Param('id') id: string,
+    @Body('status') status: OrderStatus,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.ordersService.updateStatus(id, status, user);
   }
 }

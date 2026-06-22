@@ -1,5 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtPayload } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus } from './entities/order.entity';
@@ -16,9 +22,48 @@ export class OrdersService {
   }
 
   async create(dto: CreateOrderDto, dropshipperId: string) {
-    const subtotal = dto.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+    if (!dto.items.length) throw new BadRequestException('Order must contain at least one item.');
+
+    // Resolve authoritative unit prices server-side. The customer pays the price
+    // the dropshipper set when importing the product (dropshipper_products.custom_price).
+    // Client-supplied unitPrice values are never trusted.
+    const productIds = [...new Set(dto.items.map((i) => i.productId))];
+
+    const { data: imported, error: importErr } = await this.supabase.db
+      .from('dropshipper_products')
+      .select('product_id, custom_price')
+      .eq('dropshipper_id', dropshipperId)
+      .in('product_id', productIds);
+
+    if (importErr) throw new Error(importErr.message);
+
+    const priceByProduct = new Map<string, number>(
+      (imported ?? []).map((row) => [row.product_id as string, Number(row.custom_price)]),
+    );
+
+    // Every ordered product must be imported by this dropshipper and have a valid price.
+    for (const id of productIds) {
+      const price = priceByProduct.get(id);
+      if (price === undefined || !(price > 0)) {
+        throw new BadRequestException(`Product ${id} is not available in your store.`);
+      }
+    }
+
+    const pricedItems = dto.items.map((i) => {
+      const unitPrice = priceByProduct.get(i.productId)!;
+      return {
+        product_id: i.productId,
+        quantity: i.quantity,
+        unit_price: unitPrice,
+        subtotal: parseFloat((unitPrice * i.quantity).toFixed(2)),
+      };
+    });
+
+    const subtotal = parseFloat(
+      pricedItems.reduce((sum, i) => sum + i.subtotal, 0).toFixed(2),
+    );
     const platformFee = parseFloat(((subtotal * this.platformFeePercent) / 100).toFixed(2));
-    const total = subtotal + platformFee;
+    const total = parseFloat((subtotal + platformFee).toFixed(2));
 
     const { data: order, error: orderErr } = await this.supabase.db
       .from('orders')
@@ -38,13 +83,7 @@ export class OrdersService {
 
     if (orderErr) throw new Error(orderErr.message);
 
-    const items = dto.items.map((i) => ({
-      order_id: order.id,
-      product_id: i.productId,
-      quantity: i.quantity,
-      unit_price: i.unitPrice,
-      subtotal: i.unitPrice * i.quantity,
-    }));
+    const items = pricedItems.map((i) => ({ order_id: order.id, ...i }));
 
     const { error: itemsErr } = await this.supabase.db.from('order_items').insert(items);
     if (itemsErr) throw new Error(itemsErr.message);
@@ -77,9 +116,19 @@ export class OrdersService {
     return data;
   }
 
-  async updateStatus(id: string, status: OrderStatus) {
+  async updateStatus(id: string, status: OrderStatus, user: JwtPayload) {
     const allowed: OrderStatus[] = ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
     if (!allowed.includes(status)) throw new BadRequestException('Invalid status.');
+
+    // Suppliers may only progress fulfillment, and only on orders that contain
+    // at least one of their own products. Admins may set any status.
+    if (user.role === 'supplier') {
+      const supplierStatuses: OrderStatus[] = ['processing', 'shipped', 'delivered'];
+      if (!supplierStatuses.includes(status)) {
+        throw new ForbiddenException('Suppliers may only update fulfillment status.');
+      }
+      await this.assertSupplierOwnsOrder(id, user.sub);
+    }
 
     const { data, error } = await this.supabase.db
       .from('orders')
@@ -88,8 +137,28 @@ export class OrdersService {
       .select()
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error || !data) throw new NotFoundException(`Order ${id} not found.`);
     return data;
+  }
+
+  /** Ensures the order contains at least one product belonging to this supplier. */
+  private async assertSupplierOwnsOrder(orderId: string, supplierId: string) {
+    const { data: items, error } = await this.supabase.db
+      .from('order_items')
+      .select('products(supplier_id)')
+      .eq('order_id', orderId);
+
+    if (error) throw new Error(error.message);
+
+    const ownsAny = (items ?? []).some((row) => {
+      const product = (row as { products?: { supplier_id?: string } | { supplier_id?: string }[] }).products;
+      const list = Array.isArray(product) ? product : product ? [product] : [];
+      return list.some((p) => p.supplier_id === supplierId);
+    });
+
+    if (!ownsAny) {
+      throw new ForbiddenException('You can only update orders containing your products.');
+    }
   }
 
   async adminListAll(page = 1, limit = 20) {

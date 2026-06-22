@@ -5,7 +5,8 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody is required to verify payment webhook HMAC signatures over the exact payload.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   
   // Set global API prefix matching rest docs: /v1
   app.setGlobalPrefix('v1');
