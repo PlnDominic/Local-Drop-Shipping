@@ -125,8 +125,12 @@ export const DropshipperRegister: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F9FAFB] font-sans grid lg:grid-cols-2">
       {/* Brand panel */}
-      <div className="relative hidden lg:flex flex-col justify-between bg-[#151515] text-white p-12 overflow-hidden">
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[#f04438]/20 blur-3xl" />
+      <div
+        className="relative hidden lg:flex flex-col justify-between text-white p-12 overflow-hidden"
+        style={{ backgroundImage: "url('/dropshipper-bg.jpg')", backgroundSize: 'cover', backgroundPosition: 'center top' }}
+      >
+        {/* Black + red gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/85 via-black/70 to-[#f04438]/60" />
         <Link href="/" className="relative flex items-center gap-2.5 w-fit">
           <div className="grid h-8 w-8 place-items-center bg-[#f04438] font-black text-white">LD</div>
           <span className="font-black text-lg tracking-tight">
