@@ -602,10 +602,16 @@ export const Marketplace: React.FC = () => {
             <ChevronDown size={13} className={categoryMenuOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
           </button>
 
-          {['Marketplace', 'New Arrivals', 'Supplier Portal', 'Start Dropshipping', 'API Docs'].map((link) => (
-            <a key={link} href="#" onClick={(e) => e.preventDefault()} className="hidden md:block whitespace-nowrap hover:text-[#f04438] transition-colors">
-              {link}
-            </a>
+          {[
+            { label: 'Marketplace', href: '/' },
+            { label: 'New Arrivals', href: '/' },
+            { label: 'Supplier Portal', href: '/supplier' },
+            { label: 'Start Dropshipping', href: '/dropshipper' },
+            { label: 'API Docs', href: '/docs' },
+          ].map(({ label, href }) => (
+            <Link key={label} href={href} className="hidden md:block whitespace-nowrap hover:text-[#f04438] transition-colors">
+              {label}
+            </Link>
           ))}
 
           <div className="ml-auto flex items-center gap-2 text-[#f04438] font-black hidden md:flex">
@@ -1044,10 +1050,15 @@ export const Marketplace: React.FC = () => {
 
           <div>
             <h4 className="text-[13px] font-black mb-4 text-gray-200">Quick Links</h4>
-            {['Marketplace', 'Start Dropshipping', 'Supplier Portal', 'Admin Panel'].map((link) => (
-              <a key={link} href="#" onClick={(e) => e.preventDefault()} className="block text-[12px] text-gray-400 hover:text-white mb-2 transition-colors">
-                {link}
-              </a>
+            {[
+              { label: 'Marketplace', href: '/' },
+              { label: 'Start Dropshipping', href: '/dropshipper' },
+              { label: 'Supplier Portal', href: '/supplier' },
+              { label: 'Admin Panel', href: '/admin' },
+            ].map(({ label, href }) => (
+              <Link key={label} href={href} className="block text-[12px] text-gray-400 hover:text-white mb-2 transition-colors">
+                {label}
+              </Link>
             ))}
           </div>
 
