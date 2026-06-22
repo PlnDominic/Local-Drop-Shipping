@@ -7,8 +7,7 @@ import { DropshipperDashboard } from '../views/DropshipperDashboard';
 import { SupplierDashboard } from '../views/SupplierDashboard';
 import { AdminDashboard } from '../views/AdminDashboard';
 import { DiagramsAndDocs } from '../views/DiagramsAndDocs';
-import { ToastContainer } from './Toast';
-import { 
+import {
   Home as HomeIcon, 
   ShoppingBag, 
   LayoutDashboard, 
@@ -64,8 +63,6 @@ const AppShell: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <ToastContainer />
-
       {/* Simulator Device Wrapper */}
       {mobilePreview ? (
         <div className="flex-1 flex items-center justify-center p-6 md:p-12 bg-gray-900 dot-grid">

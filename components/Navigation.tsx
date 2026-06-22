@@ -1,6 +1,9 @@
+'use client';
+
 import React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useGlobalStore } from '../store/globalStore';
-import type { UserRole } from '../store/globalStore';
 import type { LucideIcon } from 'lucide-react';
 import {
   ShoppingBag,
@@ -9,24 +12,33 @@ import {
   ShieldAlert,
   Code,
   Bell,
-  Wallet
+  Wallet,
+  Smartphone
 } from 'lucide-react';
 
-export const Navigation: React.FC = () => {
-  const { activeRole, setActiveRole, cart, wallets, notifications } = useGlobalStore();
+interface NavLink {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  desc: string;
+}
 
-  const roles: { role: UserRole; label: string; icon: LucideIcon; desc: string }[] = [
-    { role: 'customer',    label: 'Marketplace',        icon: ShoppingBag, desc: 'Browse & buy products via MoMo' },
-    { role: 'dropshipper', label: 'Start Dropshipping',  icon: TrendingUp,  desc: 'Import products, set markups, earn commissions' },
-    { role: 'supplier',    label: 'Supplier Portal',     icon: Truck,       desc: 'List wholesale items, fulfill orders' },
-    { role: 'admin',       label: 'Admin Panel',         icon: ShieldAlert, desc: 'Verify suppliers, platform analytics' },
-    { role: 'developer',   label: 'API Docs & ERD',      icon: Code,        desc: 'API docs, Database ERD, Architecture' },
+export const Navigation: React.FC = () => {
+  const { cart, wallets, notifications } = useGlobalStore();
+  const pathname = usePathname();
+
+  const links: NavLink[] = [
+    { href: '/marketplace', label: 'Marketplace',        icon: ShoppingBag, desc: 'Browse & buy products via MoMo' },
+    { href: '/dropshipper', label: 'Start Dropshipping',  icon: TrendingUp,  desc: 'Import products, set markups, earn commissions' },
+    { href: '/supplier',    label: 'Supplier Portal',     icon: Truck,       desc: 'List wholesale items, fulfill orders' },
+    { href: '/admin',       label: 'Admin Panel',         icon: ShieldAlert, desc: 'Verify suppliers, platform analytics' },
+    { href: '/docs',        label: 'API Docs & ERD',      icon: Code,        desc: 'API docs, Database ERD, Architecture' },
   ];
 
   const getWalletDisplay = () => {
-    if (activeRole === 'dropshipper') return `GHS ${wallets['u-dropshipper-1']?.balance.toFixed(2)}`;
-    if (activeRole === 'supplier')    return `GHS ${wallets['u-supplier-1']?.balance.toFixed(2)}`;
-    if (activeRole === 'admin')       return `GHS ${wallets['u-admin-1']?.balance.toFixed(2)}`;
+    if (pathname === '/dropshipper') return `GHS ${wallets['u-dropshipper-1']?.balance.toFixed(2)}`;
+    if (pathname === '/supplier')    return `GHS ${wallets['u-supplier-1']?.balance.toFixed(2)}`;
+    if (pathname === '/admin')       return `GHS ${wallets['u-admin-1']?.balance.toFixed(2)}`;
     return null;
   };
 
@@ -38,7 +50,7 @@ export const Navigation: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
 
         {/* Logo */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <div className="w-8 h-8 bg-primary flex items-center justify-center text-accent font-black text-base shadow-md">
             LD
           </div>
@@ -46,17 +58,17 @@ export const Navigation: React.FC = () => {
             <span className="font-extrabold text-lg text-primary tracking-tight">Local Drop Shipping</span>
             <span className="text-accent font-black text-lg"> GH</span>
           </div>
-        </div>
+        </Link>
 
         {/* Nav tabs */}
         <nav className="flex-1 flex items-center gap-0.5 overflow-x-auto scrollbar-none">
-          {roles.map((r) => {
+          {links.map((r) => {
             const Icon = r.icon;
-            const isActive = activeRole === r.role;
+            const isActive = pathname === r.href;
             return (
-              <button
-                key={r.role}
-                onClick={() => setActiveRole(r.role)}
+              <Link
+                key={r.href}
+                href={r.href}
                 title={r.desc}
                 className={`flex items-center gap-1.5 px-3 h-16 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
                   isActive
@@ -66,12 +78,12 @@ export const Navigation: React.FC = () => {
               >
                 <Icon size={15} className={isActive ? 'text-primary' : 'text-gray-400'} />
                 <span>{r.label}</span>
-                {r.role === 'customer' && cartCount > 0 && (
+                {r.href === '/marketplace' && cartCount > 0 && (
                   <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 ml-0.5">
                     {cartCount}
                   </span>
                 )}
-              </button>
+              </Link>
             );
           })}
         </nav>
@@ -84,6 +96,13 @@ export const Navigation: React.FC = () => {
               <span>{walletDisplay}</span>
             </div>
           )}
+          <Link
+            href="/simulator"
+            title="Mobile app simulator"
+            className="p-2 text-neutral-gray hover:text-neutral-dark hover:bg-gray-100 transition-colors"
+          >
+            <Smartphone size={20} />
+          </Link>
           <div className="relative">
             <button className="p-2 text-neutral-gray hover:text-neutral-dark hover:bg-gray-100 transition-colors">
               <Bell size={20} />

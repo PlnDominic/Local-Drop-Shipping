@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { ToastContainer } from '../components/Toast';
 
 const heroImage = 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=90';
 
@@ -43,7 +44,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-neutral-light text-neutral-dark font-sans antialiased">{children}</body>
+      <body className="bg-neutral-light text-neutral-dark font-sans antialiased">
+        {children}
+        <ToastContainer />
+      </body>
     </html>
   );
 }
