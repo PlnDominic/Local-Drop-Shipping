@@ -87,10 +87,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle: AuthContextValue['signInWithGoogle'] = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      // After Google auth, Supabase redirects back here and detectSessionInUrl
-      // (set on the client) completes the session.
+      // After Google auth, Supabase redirects to /callback where the client
+      // (detectSessionInUrl) completes the session. This path must be in the
+      // Supabase "Redirect URLs" allow list.
       options: {
-        redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/callback` : undefined,
       },
     });
     return { error: error?.message ?? null };
