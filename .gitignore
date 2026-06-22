@@ -34,3 +34,4 @@ backend/.env.local
 backend/dist
 backend/node_modules
 .claude/
+.vercel
