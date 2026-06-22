@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 
 export interface PaystackInitResponse {
   authorization_url: string;
@@ -53,5 +54,18 @@ export class PaystackProvider {
     });
     const json = (await res.json()) as { data: PaystackVerifyResponse };
     return json.data;
+  }
+
+  /**
+   * Verifies a Paystack webhook signature: HMAC-SHA512 of the raw request body
+   * keyed with the secret key, compared in constant time against the header.
+   */
+  verifySignature(rawBody: Buffer | undefined, signature: string | undefined): boolean {
+    if (!rawBody || !signature) return false;
+    const expected = crypto.createHmac('sha512', this.secretKey).update(rawBody).digest('hex');
+    const expectedBuf = Buffer.from(expected);
+    const signatureBuf = Buffer.from(signature);
+    if (expectedBuf.length !== signatureBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, signatureBuf);
   }
 }

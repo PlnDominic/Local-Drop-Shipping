@@ -1,7 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 
 export type TransactionType = 'credit' | 'debit' | 'commission' | 'withdrawal';
+
+/** Max optimistic-concurrency retries when a concurrent balance change is detected. */
+const MAX_CAS_RETRIES = 5;
 
 @Injectable()
 export class WalletService {
@@ -39,13 +42,9 @@ export class WalletService {
   }
 
   async credit(userId: string, amount: number, description: string, type: TransactionType = 'credit') {
-    const wallet = await this.getBalance(userId);
-    const newBalance = Number(wallet.balance) + amount;
+    if (!(amount > 0)) throw new BadRequestException('Credit amount must be positive.');
 
-    await this.supabase.db
-      .from('wallets')
-      .update({ balance: newBalance, updated_at: new Date().toISOString() })
-      .eq('user_id', userId);
+    const newBalance = await this.adjustBalance(userId, amount);
 
     const { data } = await this.supabase.db
       .from('wallet_transactions')
@@ -57,17 +56,9 @@ export class WalletService {
   }
 
   async withdraw(userId: string, amount: number, accountDetails: Record<string, string>) {
-    const wallet = await this.getBalance(userId);
-    if (Number(wallet.balance) < amount) {
-      throw new BadRequestException('Insufficient wallet balance.');
-    }
+    if (!(amount > 0)) throw new BadRequestException('Withdrawal amount must be positive.');
 
-    const newBalance = Number(wallet.balance) - amount;
-
-    await this.supabase.db
-      .from('wallets')
-      .update({ balance: newBalance, updated_at: new Date().toISOString() })
-      .eq('user_id', userId);
+    const newBalance = await this.adjustBalance(userId, -amount);
 
     const { data } = await this.supabase.db
       .from('wallet_transactions')
@@ -83,5 +74,37 @@ export class WalletService {
       .single();
 
     return data;
+  }
+
+  /**
+   * Atomically applies `delta` to a wallet balance using optimistic concurrency
+   * (compare-and-swap on the previously read balance). This prevents the lost-update
+   * / double-spend race that a plain read-modify-write would allow under concurrency.
+   * Throws if the wallet would go negative.
+   */
+  private async adjustBalance(userId: string, delta: number): Promise<number> {
+    for (let attempt = 0; attempt < MAX_CAS_RETRIES; attempt++) {
+      const wallet = await this.getBalance(userId);
+      const current = Number(wallet.balance);
+      const next = parseFloat((current + delta).toFixed(2));
+
+      if (next < 0) {
+        throw new BadRequestException('Insufficient wallet balance.');
+      }
+
+      // Only succeeds if the balance hasn't changed since we read it.
+      const { data, error } = await this.supabase.db
+        .from('wallets')
+        .update({ balance: next, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('balance', current)
+        .select('balance');
+
+      if (error) throw new Error(error.message);
+      if (data && data.length === 1) return next;
+      // Otherwise a concurrent update changed the balance — retry with fresh state.
+    }
+
+    throw new BadRequestException('Wallet is busy, please retry.');
   }
 }
