@@ -7,7 +7,6 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   // Surfaced loudly so a misconfigured deploy is obvious rather than silently empty.
-  // eslint-disable-next-line no-console
   console.error(
     '[supabase] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. ' +
       'Set them in your environment (see .env.example).',

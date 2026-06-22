@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '../lib/supabase/client';
 
 export type UserRole = 'customer' | 'dropshipper' | 'supplier' | 'admin' | 'developer';
 
@@ -149,13 +150,21 @@ interface AppState {
   mobilePreview: boolean;
   setMobilePreview: (active: boolean) => void;
 
-  // Promo Codes
+  // Current signed-in user (resolved from Supabase Auth; null when logged out)
+  currentUserId: string | null;
+  setCurrentUserId: (id: string | null) => void;
+
+  // Data hydration from Supabase
+  hydrated: boolean;
+  hydrate: () => Promise<void>;
+
+  // Promo Codes (loaded from backend; no hardcoded discounts)
   promoCodes: Record<string, number>;
   appliedPromo: { code: string; discount: number } | null;
   applyPromoCode: (code: string) => boolean;
   clearPromo: () => void;
-  
-  // Database Tables
+
+  // Data Tables (hydrated from Supabase)
   users: User[];
   supplierProfiles: SupplierProfile[];
   dropshipperProfiles: DropshipperProfile[];
@@ -210,229 +219,42 @@ interface AppState {
   releaseCommission: (commissionId: string) => void;
 }
 
-// Initial Mock Data Setup
-const mockUsers: User[] = [
-  {
-    id: 'u-customer-1',
-    email: 'ama.mensah@gmail.com',
-    phone: '+233 24 412 3456',
-    fullName: 'Ama Mensah',
-    role: 'customer',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80',
-    isVerified: true
-  },
-  {
-    id: 'u-dropshipper-1',
-    email: 'kofi.deals@localdropshipping.gh.com',
-    phone: '+233 55 876 5432',
-    fullName: 'Kofi Owusu',
-    role: 'dropshipper',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
-    isVerified: true
-  },
-  {
-    id: 'u-supplier-1',
-    email: 'contact@kantanka-electronics.com',
-    phone: '+233 20 999 8888',
-    fullName: 'Kantanka Wholesalers Ltd.',
-    role: 'supplier',
-    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&h=150&q=80',
-    isVerified: true
-  },
-  {
-    id: 'u-supplier-2',
-    email: 'accrafashionhub@gmail.com',
-    phone: '+233 24 111 2222',
-    fullName: 'Accra Fashion District Hub',
-    role: 'supplier',
-    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80',
-    isVerified: false // Needs Admin Approval
-  },
-  {
-    id: 'u-admin-1',
-    email: 'admin@localdropshipping.gh.com',
-    phone: '+233 24 000 0000',
-    fullName: 'Yaw Boateng (Admin)',
-    role: 'admin',
-    avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=150&h=150&q=80',
-    isVerified: true
-  }
-];
+// ── DB row → store type mappers (snake_case → camelCase) ─────────────────────
 
-const mockSupplierProfiles: SupplierProfile[] = [
-  {
-    id: 'sp-1',
-    userId: 'u-supplier-1',
-    businessName: 'Kantanka Wholesalers Ltd.',
-    businessRegNumber: 'CG012938483',
-    region: 'Greater Accra',
-    isApproved: true,
-    rating: 4.8
-  },
-  {
-    id: 'sp-2',
-    userId: 'u-supplier-2',
-    businessName: 'Accra Fashion District Hub',
-    businessRegNumber: 'CG018274619',
-    region: 'Ashanti Region',
-    isApproved: false, // Pending admin approval
-    rating: 0.0
-  }
-];
+interface ProductDbRow {
+  id: string;
+  supplier_id: string;
+  category_id: string;
+  name: string;
+  description: string;
+  images: string[] | null;
+  cost_price: number;
+  suggested_price: number;
+  stock_qty: number;
+  sku: string;
+  is_active: boolean;
+  created_at: string;
+  supplier_profiles?: { business_name: string } | null;
+}
 
-const mockDropshipperProfiles: DropshipperProfile[] = [
-  {
-    id: 'dp-1',
-    userId: 'u-dropshipper-1',
-    storeName: 'Kofi\'s Express Deals',
-    storeSlug: 'kofiexpress',
-    commissionRate: 12.50
-  }
-];
-
-const mockCategories: Category[] = [
-  { id: 'cat-1', name: 'Electronics', slug: 'electronics', icon: 'Tv' },
-  { id: 'cat-2', name: 'Fashion & Apparel', slug: 'fashion', icon: 'Shirt' },
-  { id: 'cat-3', name: 'Beauty & Cosmetics', slug: 'beauty', icon: 'Sparkles' },
-  { id: 'cat-4', name: 'Home & Kitchen', slug: 'home', icon: 'Home' },
-  { id: 'cat-5', name: 'Health & Wellness', slug: 'health', icon: 'Activity' },
-  { id: 'cat-6', name: 'Local Foodstuffs', slug: 'food', icon: 'Utensils' }
-];
-
-const mockProducts: Product[] = [
-  {
-    id: 'p-1',
-    supplierId: 'sp-1',
-    supplierName: 'Kantanka Wholesalers Ltd.',
-    categoryId: 'cat-1',
-    name: 'Kantanka Smart TV 43" (4K UHD)',
-    description: 'Stunning 4K Ultra High Definition smart TV made right here in Ghana. Preloaded with Netflix, YouTube, and DSTV app. Energy efficient, built for West African power grids.',
-    images: ['https://images.unsplash.com/photo-1593305841991-05c297ba4575?auto=format&fit=crop&w=600&h=400&q=80'],
-    costPrice: 1800.00,
-    suggestedPrice: 2200.00,
-    stockQty: 45,
-    sku: 'KTK-TV-43',
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    reviews: [
-      { id: 'r-1-1', author: 'Kwame Asante', rating: 5, comment: 'Chale, this TV is fire! Picture quality is clear like cinema. DSTV loaded fine and the sound is loud enough for the compound.', date: '2024-11-15' },
-      { id: 'r-1-2', author: 'Abena Osei', rating: 4, comment: 'Very good TV for the price. Delivery was fast via GhanaPost. Only small thing is the remote could feel more premium.', date: '2024-12-02' },
-      { id: 'r-1-3', author: 'Yaw Darko', rating: 5, comment: 'Made in Ghana product that actually works! Netflix streams smoothly even on my router. Proud to support local.', date: '2025-01-08' },
-      { id: 'r-1-4', author: 'Efua Mensah', rating: 4, comment: 'Bought it for the living room. Family loves it. 4K is really sharp. Setup was easy with the instructions.', date: '2025-02-14' }
-    ]
-  },
-  {
-    id: 'p-2',
-    supplierId: 'sp-1',
-    supplierName: 'Kantanka Wholesalers Ltd.',
-    categoryId: 'cat-1',
-    name: 'Wireless MoMo Power Bank 20,000mAh',
-    description: 'Heavy duty power bank with solar charging capability and integrated cables. Perfect for long travel days and keeping your phones running during dumsor.',
-    images: ['https://images.unsplash.com/photo-1609592424109-dd9892f1b17c?auto=format&fit=crop&w=600&h=400&q=80'],
-    costPrice: 120.00,
-    suggestedPrice: 180.00,
-    stockQty: 150,
-    sku: 'KTK-PB-20K',
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    reviews: [
-      { id: 'r-2-1', author: 'Ama Boateng', rating: 5, comment: 'This power bank saved me during the last dumsor! Charged my phone 4 times before running out. The solar feature actually works.', date: '2024-10-22' },
-      { id: 'r-2-2', author: 'Kofi Adjei', rating: 4, comment: 'Very solid build, not cheap at all. Takes a while to fully charge itself but once charged it lasts days.', date: '2024-11-30' },
-      { id: 'r-2-3', author: 'Adwoa Frimpong', rating: 5, comment: 'Perfect for my trips to Kumasi. Two USB ports charged my phone and tablet at the same time. No heating issues.', date: '2025-01-20' },
-      { id: 'r-2-4', author: 'Nana Owusu', rating: 3, comment: 'Good product but the solar charging is slow. Still does the job for backup power. Would buy again.', date: '2025-03-05' },
-      { id: 'r-2-5', author: 'Akosua Asare', rating: 5, comment: 'Bought for my market stall. Keeps my POS machine running all day. Really durable, fell once and no damage.', date: '2025-04-10' }
-    ]
-  },
-  {
-    id: 'p-3',
-    supplierId: 'sp-2',
-    supplierName: 'Accra Fashion District Hub',
-    categoryId: 'cat-2',
-    name: 'Premium Kente Print Unisex Bomber Jacket',
-    description: 'Handwoven genuine Bonwire Kente print sleeves with comfortable fleece body. High quality local zipper and inner lining. Crafted in Kumasi.',
-    images: ['https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=600&h=400&q=80'],
-    costPrice: 250.00,
-    suggestedPrice: 350.00,
-    stockQty: 30,
-    sku: 'AFD-KNT-JKT',
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    reviews: [
-      { id: 'r-3-1', author: 'Akwasi Mensah', rating: 5, comment: 'I wore this to the office on casual Friday and received so many compliments. The Kente pattern is authentic and beautifully done.', date: '2024-09-14' },
-      { id: 'r-3-2', author: 'Serwa Boateng', rating: 4, comment: 'Quality is very nice. The fleece is warm but not too heavy. Fits true to size. Great representation of Ghanaian culture.', date: '2024-10-05' },
-      { id: 'r-3-3', author: 'Kofi Asante', rating: 5, comment: 'Bought this for my graduation trip to London. Everyone there was asking where I got it from. Proud Ghanaian fashion!', date: '2025-02-28' }
-    ]
-  },
-  {
-    id: 'p-4',
-    supplierId: 'sp-1',
-    supplierName: 'Kantanka Wholesalers Ltd.',
-    categoryId: 'cat-4',
-    name: 'Ghanaian Handcarved Mortar & Pestle Set',
-    description: 'Sturdy Sesese wood mortar and pestle for fufu, palm nut pounding, and crushing spices. Traditional design, long-lasting wood quality.',
-    images: ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&h=400&q=80'],
-    costPrice: 85.00,
-    suggestedPrice: 130.00,
-    stockQty: 80,
-    sku: 'KTK-MOR-PES',
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    reviews: [
-      { id: 'r-4-1', author: 'Adwoa Owusu', rating: 5, comment: 'The best mortar and pestle I have used! Really heavy and sturdy. My banku and fufu comes out perfect now. Traditional quality!', date: '2024-08-20' },
-      { id: 'r-4-2', author: 'Kweku Darko', rating: 4, comment: 'Great product. The wood is solid and well-carved. Bought it as a gift for my mother and she loves it.', date: '2024-11-12' },
-      { id: 'r-4-3', author: 'Abena Asante', rating: 5, comment: 'Finally a local product done right. Crushes spices perfectly and the smell of the Sesese wood adds flavor. Will order more.', date: '2025-01-18' },
-      { id: 'r-4-4', author: 'Yaa Boateng', rating: 4, comment: 'Very authentic and heavy. Good for serious pounding. Ships with padding so no damage. Happy with the purchase.', date: '2025-03-22' }
-    ]
-  }
-];
-
-// Initial imported dropshipper products (Published under Kofi's Store)
-const mockDropshipperProducts: DropshipperProduct[] = [
-  {
-    id: 'dp-prod-1',
-    dropshipperId: 'dp-1',
-    productId: 'p-1',
-    product: mockProducts[0],
-    sellingPrice: 2150.00, // profit: 350.00
-    customDescription: 'Bring cinema quality entertainment to your home with the original 43" Smart TV, engineered for stable power performance and featuring local app integration.',
-    isPublished: true
-  },
-  {
-    id: 'dp-prod-2',
-    dropshipperId: 'dp-1',
-    productId: 'p-2',
-    product: mockProducts[1],
-    sellingPrice: 175.00, // profit: 55.00
-    customDescription: 'Say goodbye to Dumsor! Premium 20,000mAh Power Bank with Solar backup charging. Charges 3 devices at once.',
-    isPublished: true
-  },
-  {
-    id: 'dp-prod-3',
-    dropshipperId: 'dp-1',
-    productId: 'p-3',
-    product: mockProducts[2],
-    sellingPrice: 340.00,
-    customDescription: 'Premium Kente print bomber jacket from a local fashion supplier, ready for fast delivery.',
-    isPublished: true
-  },
-  {
-    id: 'dp-prod-4',
-    dropshipperId: 'dp-1',
-    productId: 'p-4',
-    product: mockProducts[3],
-    sellingPrice: 125.00,
-    customDescription: 'Traditional Ghanaian mortar and pestle set for home kitchens and local food lovers.',
-    isPublished: true
-  }
-];
-
-// Prepopulated Wallets
-const initialWallets: Record<string, Wallet> = {
-  'u-dropshipper-1': { id: 'w-dp-1', userId: 'u-dropshipper-1', balance: 450.00, totalEarned: 1850.00 },
-  'u-supplier-1': { id: 'w-sp-1', userId: 'u-supplier-1', balance: 5400.00, totalEarned: 12500.00 },
-  'u-supplier-2': { id: 'w-sp-2', userId: 'u-supplier-2', balance: 0.00, totalEarned: 0.00 },
-  'u-admin-1': { id: 'w-ad-1', userId: 'u-admin-1', balance: 125.50, totalEarned: 890.00 },
-};
+function mapProductRow(p: ProductDbRow): Product {
+  return {
+    id: p.id,
+    supplierId: p.supplier_id,
+    supplierName: p.supplier_profiles?.business_name ?? '',
+    categoryId: p.category_id,
+    name: p.name,
+    description: p.description,
+    images: p.images ?? [],
+    costPrice: Number(p.cost_price),
+    suggestedPrice: Number(p.suggested_price),
+    stockQty: p.stock_qty,
+    sku: p.sku,
+    isActive: p.is_active,
+    createdAt: p.created_at,
+    reviews: [],
+  };
+}
 
 export const useGlobalStore = create<AppState>((set, get) => ({
   activeRole: 'customer',
@@ -440,8 +262,94 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   mobilePreview: false,
   setMobilePreview: (active) => set({ mobilePreview: active }),
 
-  // Promo Codes
-  promoCodes: { 'LAUNCH10': 0.10, 'GHANA20': 0.20, 'WELCOME15': 0.15 },
+  currentUserId: null,
+  setCurrentUserId: (id) => set({ currentUserId: id }),
+
+  hydrated: false,
+  hydrate: async () => {
+    const uid = get().currentUserId;
+    try {
+      const [catsRes, prodsRes, dpsRes] = await Promise.all([
+        supabase.from('categories').select('*').order('name'),
+        supabase
+          .from('products')
+          .select('*, supplier_profiles(business_name)')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('dropshipper_products')
+          .select('*, products(*, supplier_profiles(business_name))')
+          .eq('is_published', true)
+          .order('created_at', { ascending: false }),
+      ]);
+
+      const categories: Category[] = (catsRes.data ?? []).map((c) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        icon: c.icon,
+      }));
+
+      const products: Product[] = (prodsRes.data ?? []).map((p) =>
+        mapProductRow(p as ProductDbRow),
+      );
+
+      const dropshipperProducts: DropshipperProduct[] = (dpsRes.data ?? [])
+        .filter((d) => d.products)
+        .map((d) => ({
+          id: d.id,
+          dropshipperId: d.dropshipper_id,
+          productId: d.product_id,
+          product: mapProductRow(d.products as ProductDbRow),
+          sellingPrice: Number(d.custom_price),
+          customDescription: d.custom_description ?? (d.products as ProductDbRow).description,
+          isPublished: d.is_published,
+        }));
+
+      let wallets: Record<string, Wallet> = {};
+      let transactions: Transaction[] = [];
+
+      if (uid) {
+        const [walletRes, txRes] = await Promise.all([
+          supabase.from('wallets').select('*').eq('user_id', uid).maybeSingle(),
+          supabase
+            .from('wallet_transactions')
+            .select('*')
+            .eq('user_id', uid)
+            .order('created_at', { ascending: false })
+            .limit(50),
+        ]);
+
+        const w = walletRes.data;
+        wallets = {
+          [uid]: {
+            id: w?.id ?? `wallet-${uid}`,
+            userId: uid,
+            balance: Number(w?.balance ?? 0),
+            totalEarned: Number(w?.total_earned ?? 0),
+          },
+        };
+
+        transactions = (txRes.data ?? []).map((t) => ({
+          id: t.id,
+          walletId: t.user_id,
+          amount: Number(t.amount),
+          type: (t.type === 'commission' ? 'credit' : t.type) as Transaction['type'],
+          description: t.description,
+          reference: t.reference ?? '',
+          createdAt: t.created_at,
+        }));
+      }
+
+      set({ categories, products, dropshipperProducts, wallets, transactions, hydrated: true });
+    } catch {
+      // Surface an empty (not fake) state if Supabase is unreachable.
+      set({ hydrated: true });
+    }
+  },
+
+  // Promo Codes — loaded from backend; empty until a promotions source exists.
+  promoCodes: {},
   appliedPromo: null,
   applyPromoCode: (code) => {
     const state = get();
@@ -454,25 +362,17 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   },
   clearPromo: () => set({ appliedPromo: null }),
 
-  users: mockUsers,
-  supplierProfiles: mockSupplierProfiles,
-  dropshipperProfiles: mockDropshipperProfiles,
-  categories: mockCategories,
-  products: mockProducts,
-  dropshipperProducts: mockDropshipperProducts,
+  users: [],
+  supplierProfiles: [],
+  dropshipperProfiles: [],
+  categories: [],
+  products: [],
+  dropshipperProducts: [],
   orders: [],
-  wallets: initialWallets,
+  wallets: {},
   transactions: [],
   commissions: [],
-  notifications: [
-    {
-      id: 'notif-init',
-      type: 'sms',
-      recipient: '+233 55 876 5432',
-      message: 'Welcome to LocalDropshipping.gh.com! Start importing products to your store now.',
-      timestamp: new Date(Date.now() - 3600000).toISOString()
-    }
-  ],
+  notifications: [],
   cart: [],
 
   // Cart operations
@@ -504,57 +404,43 @@ export const useGlobalStore = create<AppState>((set, get) => ({
 
   clearCart: () => set({ cart: [] }),
 
-  // Supplier adds a product
   addSupplierProduct: (productData) => set((state) => {
+    const uid = state.currentUserId;
+    if (!uid) return {};
+    const supplierName = state.supplierProfiles.find((s) => s.userId === uid)?.businessName ?? '';
     const newProduct: Product = {
       ...productData,
-      id: `p-${state.products.length + 1}`,
-      supplierId: 'sp-1', // Default acting supplier
-      supplierName: 'Kantanka Wholesalers Ltd.',
-      createdAt: new Date().toISOString()
+      id: `local-${Date.now()}`,
+      supplierId: uid,
+      supplierName,
+      createdAt: new Date().toISOString(),
     };
-    
-    // Add transaction log
-    const notification: NotificationLog = {
-      id: `notif-${Date.now()}`,
-      type: 'email',
-      recipient: 'contact@kantanka-electronics.com',
-      message: `Product uploaded successfully: ${newProduct.name}. Pending dropshipper discovery.`,
-      timestamp: new Date().toISOString()
-    };
-
-    return {
-      products: [...state.products, newProduct],
-      notifications: [notification, ...state.notifications]
-    };
+    return { products: [newProduct, ...state.products] };
   }),
 
   updateSupplierProductStock: (productId, newQty) => set((state) => ({
     products: state.products.map(p => p.id === productId ? { ...p, stockQty: newQty } : p)
   })),
 
-  // Dropshipper Imports
   importProductToStore: (productId, sellingPrice, desc) => set((state) => {
-    const product = state.products.find(p => p.id === productId);
+    const uid = state.currentUserId;
+    if (!uid) return {};
+    const product = state.products.find((p) => p.id === productId);
     if (!product) return {};
-
-    // Check if already imported
-    const exists = state.dropshipperProducts.find(dp => dp.productId === productId && dp.dropshipperId === 'dp-1');
+    const exists = state.dropshipperProducts.find(
+      (dp) => dp.productId === productId && dp.dropshipperId === uid,
+    );
     if (exists) return {};
-
     const newImported: DropshipperProduct = {
-      id: `dp-prod-${state.dropshipperProducts.length + 1}`,
-      dropshipperId: 'dp-1',
-      productId: productId,
-      product: product,
-      sellingPrice: sellingPrice,
+      id: `local-${Date.now()}`,
+      dropshipperId: uid,
+      productId,
+      product,
+      sellingPrice,
       customDescription: desc || product.description,
-      isPublished: true
+      isPublished: true,
     };
-
-    return {
-      dropshipperProducts: [...state.dropshipperProducts, newImported]
-    };
+    return { dropshipperProducts: [...state.dropshipperProducts, newImported] };
   }),
 
   togglePublishProduct: (dropshipperProductId) => set((state) => ({
@@ -573,178 +459,69 @@ export const useGlobalStore = create<AppState>((set, get) => ({
     dropshipperProducts: state.dropshipperProducts.filter(dp => dp.id !== dropshipperProductId)
   })),
 
-  // Fulfill orders
-  fulfillOrder: (orderId) => set((state) => {
-    const order = state.orders.find(o => o.id === orderId);
-    if (!order) return {};
+  withdrawFunds: (userId, amount, details) => {
+    const state = get();
+    const wallet = state.wallets[userId];
+    if (!wallet || wallet.balance < amount || amount <= 0) return false;
 
-    // Notify Customer via SMS
-    const customerSMS: NotificationLog = {
-      id: `notif-${Date.now()}-c`,
-      type: 'sms',
-      recipient: order.deliveryAddress.phone,
-      message: `Hi ${order.deliveryAddress.fullName}, your order ${order.orderNumber} is processing! GhanaPost GPS tracker code: ${order.deliveryAddress.ghanaPostGps}.`,
-      timestamp: new Date().toISOString()
-    };
-
-    return {
-      orders: state.orders.map(o => o.id === orderId ? { ...o, status: 'processing' } : o),
-      notifications: [customerSMS, ...state.notifications]
-    };
-  }),
-
-  shipOrder: (orderId) => set((state) => {
-    const order = state.orders.find(o => o.id === orderId);
-    if (!order) return {};
-
-    // Update status to shipped, and immediately credit funds to wallets
-    const supplierUserId = state.users.find(u => u.fullName === order.supplierBusinessName)?.id || 'u-supplier-1';
-    const dropshipperUserId = 'u-dropshipper-1';
-
-    // Supplier gets: cost price * quantity
-    // Dropshipper gets: profit margin (selling price - cost price) * quantity
-    // Admin gets a 2% platform fee on transaction (let's deduct from supplier or credit separately)
-    const platformFee = order.totalAmount * 0.02;
-    const finalSupplierPayout = order.costAmount - platformFee;
-
-    // Wallets update
     const updatedWallets = { ...state.wallets };
-    
-    // Credit Supplier
-    if (updatedWallets[supplierUserId]) {
-      updatedWallets[supplierUserId] = {
-        ...updatedWallets[supplierUserId],
-        balance: updatedWallets[supplierUserId].balance + finalSupplierPayout,
-        totalEarned: updatedWallets[supplierUserId].totalEarned + finalSupplierPayout,
-      };
-    }
+    updatedWallets[userId] = { ...wallet, balance: wallet.balance - amount };
 
-    // Credit Dropshipper (release commission)
-    if (updatedWallets[dropshipperUserId]) {
-      updatedWallets[dropshipperUserId] = {
-        ...updatedWallets[dropshipperUserId],
-        balance: updatedWallets[dropshipperUserId].balance + order.profitAmount,
-        totalEarned: updatedWallets[dropshipperUserId].totalEarned + order.profitAmount,
-      };
-    }
-
-    // Credit Admin (platform fee)
-    if (updatedWallets['u-admin-1']) {
-      updatedWallets['u-admin-1'] = {
-        ...updatedWallets['u-admin-1'],
-        balance: updatedWallets['u-admin-1'].balance + platformFee,
-        totalEarned: updatedWallets['u-admin-1'].totalEarned + platformFee,
-      };
-    }
-
-    // Generate Transactions
-    const txs: Transaction[] = [
-      {
-        id: `tx-${Date.now()}-sp`,
-        walletId: updatedWallets[supplierUserId]?.id || 'w-sp-1',
-        amount: finalSupplierPayout,
-        type: 'credit',
-        description: `Payout for order ${order.orderNumber} (minus platform fee)`,
-        reference: order.orderNumber,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: `tx-${Date.now()}-dp`,
-        walletId: updatedWallets[dropshipperUserId]?.id || 'w-dp-1',
-        amount: order.profitAmount,
-        type: 'credit',
-        description: `Commission earned on order ${order.orderNumber}`,
-        reference: order.orderNumber,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: `tx-${Date.now()}-ad`,
-        walletId: updatedWallets['u-admin-1']?.id || 'w-ad-1',
-        amount: platformFee,
-        type: 'credit',
-        description: `2% Platform fee from order ${order.orderNumber}`,
-        reference: order.orderNumber,
-        createdAt: new Date().toISOString()
-      }
-    ];
-
-    // Notification Logs
-    const dropshipperNotif: NotificationLog = {
-      id: `notif-${Date.now()}-dpn`,
-      type: 'whatsapp',
-      recipient: '+233 55 876 5432',
-      message: `🔥 High five Kofi! You earned GHS ${order.profitAmount.toFixed(2)} on Order ${order.orderNumber}. Balance updated!`,
-      timestamp: new Date().toISOString()
+    const tx: Transaction = {
+      id: `local-tx-${Date.now()}`,
+      walletId: wallet.id,
+      amount,
+      type: 'withdrawal',
+      description: `Withdrawal to MoMo wallet (${details})`,
+      reference: `WDR-${Math.floor(100000 + Math.random() * 900000)}`,
+      createdAt: new Date().toISOString(),
     };
 
-    const customerNotif: NotificationLog = {
-      id: `notif-${Date.now()}-cust`,
-      type: 'sms',
-      recipient: order.deliveryAddress.phone,
-      message: `Your package for Order ${order.orderNumber} has been shipped! It is on its way to ${order.deliveryAddress.city}.`,
-      timestamp: new Date().toISOString()
-    };
+    set({ wallets: updatedWallets, transactions: [tx, ...state.transactions] });
+    return true;
+  },
 
-    return {
-      orders: state.orders.map(o => o.id === orderId ? { ...o, status: 'shipped' } : o),
-      wallets: updatedWallets,
-      transactions: [...txs, ...state.transactions],
-      notifications: [dropshipperNotif, customerNotif, ...state.notifications]
-    };
-  }),
-
-  // Customer Checkout
   submitCheckout: (checkoutData) => {
     const state = get();
     if (state.cart.length === 0) return { success: false };
 
-    // Group items by supplier (since multiple products might belong to different suppliers)
-    // To keep it simple, we assume checkout is processed for a single store cart (under Kofi's Store)
     const orderNumber = `LDK-${Math.floor(100000 + Math.random() * 900000)}`;
-    const orderId = `o-${Date.now()}`;
+    const orderId = `local-o-${Date.now()}`;
 
     let totalAmount = 0;
     let profitAmount = 0;
     let costAmount = 0;
 
     const orderItems: OrderItem[] = state.cart.map((cartItem, idx) => {
-      const dpProd = state.dropshipperProducts.find(dp => dp.id === cartItem.dropshipperProductId);
+      const dpProd = state.dropshipperProducts.find((dp) => dp.id === cartItem.dropshipperProductId);
       if (!dpProd) throw new Error('Product not found');
-
-      const itemCost = dpProd.product.costPrice * cartItem.quantity;
       const itemTotal = dpProd.sellingPrice * cartItem.quantity;
       const itemProfit = (dpProd.sellingPrice - dpProd.product.costPrice) * cartItem.quantity;
-
       totalAmount += itemTotal;
       profitAmount += itemProfit;
-      costAmount += itemCost;
-
+      costAmount += dpProd.product.costPrice * cartItem.quantity;
       return {
         id: `oi-${idx}-${Date.now()}`,
         productId: dpProd.productId,
         productName: dpProd.product.name,
         quantity: cartItem.quantity,
         unitPrice: dpProd.sellingPrice,
-        costPrice: dpProd.product.costPrice
+        costPrice: dpProd.product.costPrice,
       };
     });
 
-    // Assume the supplier of the first product in cart
-    const firstDpProd = state.dropshipperProducts.find(dp => dp.id === state.cart[0].dropshipperProductId);
-    const supplierId = firstDpProd?.product.supplierId || 'sp-1';
-    const supplierProfile = state.supplierProfiles.find(sp => sp.id === supplierId);
-    const supplierBusinessName = supplierProfile?.businessName || 'Kantanka Wholesalers Ltd.';
+    const firstDp = state.dropshipperProducts.find((dp) => dp.id === state.cart[0].dropshipperProductId);
 
     const newOrder: Order = {
       id: orderId,
       orderNumber,
-      customerId: 'u-customer-1',
+      customerId: state.currentUserId ?? 'guest',
       customerName: checkoutData.fullName,
       customerPhone: checkoutData.phone,
-      dropshipperId: 'dp-1',
-      dropshipperStoreName: 'Kofi\'s Express Deals',
-      supplierId,
-      supplierBusinessName,
+      dropshipperId: firstDp?.dropshipperId ?? '',
+      dropshipperStoreName: '',
+      supplierId: firstDp?.product.supplierId ?? '',
+      supplierBusinessName: firstDp?.product.supplierName ?? '',
       status: 'pending',
       totalAmount,
       profitAmount,
@@ -754,138 +531,34 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         phone: checkoutData.phone,
         region: checkoutData.region,
         city: checkoutData.city,
-        ghanaPostGps: checkoutData.ghanaPostGps
+        ghanaPostGps: checkoutData.ghanaPostGps,
       },
       items: orderItems,
       notes: checkoutData.notes,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
-    // Update Product Stock Quantities
-    state.cart.forEach(cartItem => {
-      const dpProd = state.dropshipperProducts.find(dp => dp.id === cartItem.dropshipperProductId);
-      if (dpProd) {
-        get().updateSupplierProductStock(dpProd.productId, Math.max(0, dpProd.product.stockQty - cartItem.quantity));
-      }
-    });
-
-    // Create notifications for all entities
-    const customerSMS: NotificationLog = {
-      id: `notif-${Date.now()}-c1`,
-      type: 'sms',
-      recipient: checkoutData.phone,
-      message: `Order ${orderNumber} received. Paid GHS ${totalAmount.toFixed(2)} via ${checkoutData.paymentProvider.toUpperCase()}. Thank you for shopping with Kofi's Express Deals!`,
-      timestamp: new Date().toISOString()
-    };
-
-    const dropshipperWhatsApp: NotificationLog = {
-      id: `notif-${Date.now()}-d1`,
-      type: 'whatsapp',
-      recipient: '+233 55 876 5432',
-      message: `🔔 New Order alert! Customer ${checkoutData.fullName} bought items for GHS ${totalAmount.toFixed(2)}. Your pending profit: GHS ${profitAmount.toFixed(2)}.`,
-      timestamp: new Date().toISOString()
-    };
-
-    const supplierEmail: NotificationLog = {
-      id: `notif-${Date.now()}-s1`,
-      type: 'email',
-      recipient: 'contact@kantanka-electronics.com',
-      message: `New dropshipping order ${orderNumber} received. Total fulfillment cost payout: GHS ${costAmount.toFixed(2)}. Fulfill it now in your portal.`,
-      timestamp: new Date().toISOString()
-    };
-
-    // Add Commission record
-    const newCommission: Commission = {
-      id: `comm-${Date.now()}`,
-      orderId,
-      orderNumber,
-      dropshipperId: 'dp-1',
-      amount: profitAmount,
-      status: 'pending',
-      createdAt: new Date().toISOString()
-    };
-
-    set((state) => ({
-      orders: [newOrder, ...state.orders],
-      commissions: [newCommission, ...state.commissions],
-      notifications: [customerSMS, dropshipperWhatsApp, supplierEmail, ...state.notifications],
-      cart: [] // empty cart
-    }));
-
+    set((s) => ({ orders: [newOrder, ...s.orders], cart: [] }));
     return { success: true, orderNumber };
   },
 
-  // Dropshipper wallet withdrawal
-  withdrawFunds: (userId, amount, details) => {
-    const state = get();
-    const wallet = state.wallets[userId];
-    if (!wallet || wallet.balance < amount || amount <= 0) return false;
+  // Fulfill orders
+  fulfillOrder: (orderId) => set((state) => ({
+    orders: state.orders.map(o => o.id === orderId ? { ...o, status: 'processing' } : o)
+  })),
 
-    // Deduct balance
-    const updatedWallets = { ...state.wallets };
-    updatedWallets[userId] = {
-      ...wallet,
-      balance: wallet.balance - amount
-    };
-
-    // Create transaction log
-    const tx: Transaction = {
-      id: `tx-${Date.now()}-w`,
-      walletId: wallet.id,
-      amount,
-      type: 'withdrawal',
-      description: `Withdrawal to MoMo wallet (${details})`,
-      reference: `WDR-${Math.floor(100000 + Math.random() * 900000)}`,
-      createdAt: new Date().toISOString()
-    };
-
-    // Create SMS confirmation
-    const sms: NotificationLog = {
-      id: `notif-${Date.now()}-smsw`,
-      type: 'sms',
-      recipient: state.users.find(u => u.id === userId)?.phone || '',
-      message: `GHS ${amount.toFixed(2)} has been withdrawn from your LocalDropshipping wallet to ${details}. Reference: ${tx.reference}.`,
-      timestamp: new Date().toISOString()
-    };
-
-    set({
-      wallets: updatedWallets,
-      transactions: [tx, ...state.transactions],
-      notifications: [sms, ...state.notifications]
-    });
-
-    return true;
-  },
+  shipOrder: (orderId) => set((state) => ({
+    orders: state.orders.map(o => o.id === orderId ? { ...o, status: 'shipped' } : o)
+  })),
 
   // Admin approves a supplier
-  approveSupplier: (supplierProfileId) => set((state) => {
-    const sp = state.supplierProfiles.find(p => p.id === supplierProfileId);
-    if (!sp) return {};
-
-    const updatedProfiles = state.supplierProfiles.map(p =>
+  approveSupplier: (supplierProfileId) => set((state) => ({
+    supplierProfiles: state.supplierProfiles.map(p =>
       p.id === supplierProfileId ? { ...p, isApproved: true } : p
-    );
+    )
+  })),
 
-    const updatedUsers = state.users.map(u =>
-      u.id === sp.userId ? { ...u, isVerified: true } : u
-    );
-
-    const email: NotificationLog = {
-      id: `notif-${Date.now()}-app`,
-      type: 'email',
-      recipient: state.users.find(u => u.id === sp.userId)?.email || '',
-      message: `Congratulations! Your supplier account for ${sp.businessName} has been approved. You can now start listing products.`,
-      timestamp: new Date().toISOString()
-    };
-
-    return {
-      supplierProfiles: updatedProfiles,
-      users: updatedUsers,
-      notifications: [email, ...state.notifications]
-    };
-  }),
-
-  // Admin releases commission manually (if needed)
+  // Admin releases commission
   releaseCommission: (commissionId) => set((state) => ({
     commissions: state.commissions.map(c =>
       c.id === commissionId ? { ...c, status: 'paid' } : c

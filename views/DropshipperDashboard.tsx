@@ -28,10 +28,12 @@ export const DropshipperDashboard: React.FC = () => {
     orders,
     wallets,
     withdrawFunds,
-    transactions
+    transactions,
+    currentUserId
   } = useGlobalStore();
 
   const { showToast } = useToast();
+  const uid = currentUserId ?? '';
 
   const [activeTab, setActiveTab] = useState<'overview' | 'import' | 'my-store' | 'orders' | 'wallet'>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -53,14 +55,14 @@ export const DropshipperDashboard: React.FC = () => {
   const availableToImport = products.filter(p => !importedProductIds.includes(p.id));
 
   // Calculated Stats
-  const dpOrders = orders.filter(o => o.dropshipperId === 'dp-1');
-  const wallet = wallets['u-dropshipper-1'] || { balance: 0, totalEarned: 0 };
+  const dpOrders = orders.filter(o => o.dropshipperId === uid);
+  const wallet = wallets[uid] || { balance: 0, totalEarned: 0 };
 
   const totalSales = dpOrders.reduce((acc, o) => acc + o.totalAmount, 0);
   const totalOrders = dpOrders.length;
   const totalCommissions = dpOrders.reduce((acc, o) => acc + o.profitAmount, 0);
   const pendingCommissions = orders
-    .filter(o => o.dropshipperId === 'dp-1' && o.status !== 'shipped')
+    .filter(o => o.dropshipperId === uid && o.status !== 'shipped')
     .reduce((acc, o) => acc + o.profitAmount, 0);
 
   const handleOpenImportModal = (p: Product) => {
@@ -95,7 +97,7 @@ export const DropshipperDashboard: React.FC = () => {
       return;
     }
 
-    const success = withdrawFunds('u-dropshipper-1', amt, `${momoProvider} (${momoPhone})`);
+    const success = withdrawFunds(uid, amt, `${momoProvider} (${momoPhone})`);
     if (success) {
       setWithdrawSuccess(true);
       setWithdrawAmount('');
@@ -183,9 +185,9 @@ export const DropshipperDashboard: React.FC = () => {
             >
               <FileText size={16} />
               <span>Store Orders</span>
-              {orders.filter(o => o.dropshipperId === 'dp-1' && o.status === 'pending').length > 0 && (
+              {orders.filter(o => o.dropshipperId === uid && o.status === 'pending').length > 0 && (
                 <span className="ml-auto bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5">
-                  {orders.filter(o => o.dropshipperId === 'dp-1' && o.status === 'pending').length}
+                  {orders.filter(o => o.dropshipperId === uid && o.status === 'pending').length}
                 </span>
               )}
             </button>

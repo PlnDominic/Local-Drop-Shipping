@@ -24,7 +24,7 @@ interface NavLink {
 }
 
 export const Navigation: React.FC = () => {
-  const { cart, wallets, notifications } = useGlobalStore();
+  const { cart, wallets, notifications, currentUserId } = useGlobalStore();
   const pathname = usePathname();
 
   const links: NavLink[] = [
@@ -36,10 +36,11 @@ export const Navigation: React.FC = () => {
   ];
 
   const getWalletDisplay = () => {
-    if (pathname === '/dropshipper') return `GHS ${wallets['u-dropshipper-1']?.balance.toFixed(2)}`;
-    if (pathname === '/supplier')    return `GHS ${wallets['u-supplier-1']?.balance.toFixed(2)}`;
-    if (pathname === '/admin')       return `GHS ${wallets['u-admin-1']?.balance.toFixed(2)}`;
-    return null;
+    if (!currentUserId) return null;
+    const onWalletPage = pathname === '/dropshipper' || pathname === '/supplier' || pathname === '/admin';
+    const balance = wallets[currentUserId]?.balance;
+    if (!onWalletPage || balance === undefined) return null;
+    return `GHS ${balance.toFixed(2)}`;
   };
 
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);

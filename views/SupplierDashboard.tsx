@@ -15,11 +15,14 @@ export const SupplierDashboard: React.FC = () => {
     orders, 
     addSupplierProduct, 
     updateSupplierProductStock,
-    fulfillOrder, 
+    fulfillOrder,
     shipOrder,
     categories,
-    wallets
+    wallets,
+    currentUserId
   } = useGlobalStore();
+
+  const uid = currentUserId ?? '';
 
   const [activeTab, setActiveTab] = useState<'products' | 'upload' | 'orders'>('products');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -34,9 +37,9 @@ export const SupplierDashboard: React.FC = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [sku, setSku] = useState('');
 
-  const supplierProducts = products.filter(p => p.supplierId === 'sp-1');
-  const supplierOrders = orders.filter(o => o.supplierId === 'sp-1');
-  const wallet = wallets['u-supplier-1'] || { balance: 0, totalEarned: 0 };
+  const supplierProducts = products.filter(p => p.supplierId === uid);
+  const supplierOrders = orders.filter(o => o.supplierId === uid);
+  const wallet = wallets[uid] || { balance: 0, totalEarned: 0 };
 
   const handleProductUpload = (e: React.FormEvent) => {
     e.preventDefault();

@@ -18,15 +18,18 @@ export const AdminDashboard: React.FC = () => {
     commissions, 
     notifications, 
     approveSupplier,
-    wallets
+    wallets,
+    currentUserId
   } = useGlobalStore();
+
+  const uid = currentUserId ?? '';
 
   const pendingSuppliers = supplierProfiles.filter(sp => !sp.isApproved);
 
   // Platform aggregates
   const totalSales = orders.reduce((acc, o) => acc + o.totalAmount, 0);
   const registeredUsersCount = users.length;
-  const platformBalance = wallets['u-admin-1']?.balance || 0;
+  const platformBalance = wallets[uid]?.balance || 0;
 
   const getChannelIcon = (type: 'sms' | 'email' | 'whatsapp') => {
     switch (type) {
