@@ -1,0 +1,45 @@
+name: Supabase keep-alive
+
+# Supabase pauses free-tier projects after a period of no database activity.
+# This workflow runs a trivial query against the project every Tuesday so it
+# never goes idle long enough to be paused.
+
+on:
+  schedule:
+    # 09:00 UTC every Tuesday
+    - cron: '0 9 * * 2'
+  workflow_dispatch: {} # allows a manual "Run workflow" click for testing
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query Supabase to keep the project active
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: kkmdrwsjsfjetapzobdf
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN secret is not set. Add it under" \
+                 "Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+          http_status=$(curl -sS -o response.json -w "%{http_code}" \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"select now() as pinged_at;"}')
+
+          echo "HTTP status: $http_status"
+          cat response.json
+          echo
+
+          if [ "$http_status" -ge 300 ]; then
+            echo "::error::Supabase keep-alive query failed with status $http_status"
+            exit 1
+          fi
+
+          echo "Supabase project pinged successfully."
