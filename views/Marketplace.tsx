@@ -18,6 +18,7 @@ import {
   Plus,
   Search,
   ShoppingCart,
+  SlidersHorizontal,
   Star,
   Tag,
   Truck,
@@ -411,6 +412,11 @@ export const Marketplace: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeTab, setActiveTab] = useState<'featured' | 'bestseller' | 'latest'>('featured');
   const [currentPage, setCurrentPage] = useState(1);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [minRating, setMinRating] = useState(0);
+  const [inStockOnly, setInStockOnly] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
@@ -429,7 +435,9 @@ export const Marketplace: React.FC = () => {
     return () => clearTimeout(t);
   }, []);
 
-  useEffect(() => { setCurrentPage(1); }, [activeCategory, activeTab, query]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeCategory, activeTab, query, minPrice, maxPrice, minRating, inStockOnly]);
 
   const publishedProducts = useMemo(
     () => dropshipperProducts.filter((item) => item.isPublished),
@@ -441,6 +449,14 @@ export const Marketplace: React.FC = () => {
     [publishedProducts]
   );
 
+  const minPriceNum = minPrice.trim() === '' ? null : parseFloat(minPrice);
+  const maxPriceNum = maxPrice.trim() === '' ? null : parseFloat(maxPrice);
+  const activeFilterCount =
+    (minPriceNum !== null && !isNaN(minPriceNum) ? 1 : 0) +
+    (maxPriceNum !== null && !isNaN(maxPriceNum) ? 1 : 0) +
+    (minRating > 0 ? 1 : 0) +
+    (inStockOnly ? 1 : 0);
+
   const filteredProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
     let result = catalogProducts.filter((item) => {
@@ -450,7 +466,14 @@ export const Marketplace: React.FC = () => {
         item.product.name.toLowerCase().includes(q) ||
         item.customDescription.toLowerCase().includes(q) ||
         item.product.supplierName.toLowerCase().includes(q);
-      return matchesCategory && matchesSearch;
+      const matchesMinPrice = minPriceNum === null || isNaN(minPriceNum) || item.sellingPrice >= minPriceNum;
+      const matchesMaxPrice = maxPriceNum === null || isNaN(maxPriceNum) || item.sellingPrice <= maxPriceNum;
+      const matchesRating = minRating === 0 || computeAvgRating(item.product.reviews || []) >= minRating;
+      const stockAvailable = item.product.variants.length > 0
+        ? item.product.variants.some((v) => v.stockQty > 0)
+        : item.product.stockQty > 0;
+      const matchesStock = !inStockOnly || stockAvailable;
+      return matchesCategory && matchesSearch && matchesMinPrice && matchesMaxPrice && matchesRating && matchesStock;
     });
 
     if (activeTab === 'bestseller') {
@@ -460,7 +483,17 @@ export const Marketplace: React.FC = () => {
     }
 
     return result;
-  }, [activeCategory, catalogProducts, query, activeTab]);
+  }, [activeCategory, catalogProducts, query, activeTab, minPriceNum, maxPriceNum, minRating, inStockOnly]);
+
+  const clearAllFilters = () => {
+    setActiveCategory('all');
+    setQuery('');
+    setActiveTab('featured');
+    setMinPrice('');
+    setMaxPrice('');
+    setMinRating(0);
+    setInStockOnly(false);
+  };
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
   const pagedProducts = filteredProducts.slice(
@@ -929,18 +962,114 @@ export const Marketplace: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              {(['featured', 'bestseller', 'latest'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className={`h-8 rounded px-3 sm:px-4 text-[11px] font-black transition-colors ${activeTab === tab ? 'bg-[#f04438] text-white' : 'bg-gray-100 text-[#555] hover:bg-gray-200'}`}
-                >
-                  {tab === 'featured' ? 'Featured' : tab === 'bestseller' ? 'Best Seller' : 'Latest'}
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+                {(['featured', 'bestseller', 'latest'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    className={`h-8 flex-shrink-0 rounded px-3 sm:px-4 text-[11px] font-black transition-colors ${activeTab === tab ? 'bg-[#f04438] text-white' : 'bg-gray-100 text-[#555] hover:bg-gray-200'}`}
+                  >
+                    {tab === 'featured' ? 'Featured' : tab === 'bestseller' ? 'Best Seller' : 'Latest'}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((o) => !o)}
+                className={`flex h-8 flex-shrink-0 items-center gap-1.5 rounded border px-3 text-[11px] font-black transition-colors ${
+                  filtersOpen || activeFilterCount > 0
+                    ? 'border-[#f04438] bg-[#f04438]/10 text-[#f04438]'
+                    : 'border-gray-200 text-[#555] hover:bg-gray-50'
+                }`}
+              >
+                <SlidersHorizontal size={13} />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="grid h-4 w-4 place-items-center rounded-full bg-[#f04438] text-[9px] font-black text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
             </div>
+
+            {filtersOpen && (
+              <div className="grid grid-cols-1 gap-4 rounded border border-gray-100 bg-[#fafafa] p-4 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-[#888]">
+                    Price range (GHS)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Min"
+                      value={minPrice}
+                      onChange={(e) => setMinPrice(e.target.value)}
+                      className="h-9 w-full min-w-0 rounded border border-gray-200 px-2.5 text-[12px] outline-none focus:border-[#f04438]"
+                    />
+                    <span className="text-gray-300">–</span>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Max"
+                      value={maxPrice}
+                      onChange={(e) => setMaxPrice(e.target.value)}
+                      className="h-9 w-full min-w-0 rounded border border-gray-200 px-2.5 text-[12px] outline-none focus:border-[#f04438]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-[#888]">
+                    Minimum rating
+                  </label>
+                  <div className="flex items-center gap-1">
+                    {[0, 1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setMinRating(n)}
+                        className={`h-9 rounded border px-2.5 text-[11px] font-bold transition-colors ${
+                          minRating === n
+                            ? 'border-[#f04438] bg-[#f04438]/10 text-[#f04438]'
+                            : 'border-gray-200 text-[#555] hover:bg-white'
+                        }`}
+                      >
+                        {n === 0 ? 'Any' : `${n}+ ★`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col justify-between">
+                  <div>
+                    <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-[#888]">
+                      Availability
+                    </label>
+                    <label className="flex h-9 items-center gap-2 text-[12px] font-semibold text-[#333]">
+                      <input
+                        type="checkbox"
+                        checked={inStockOnly}
+                        onChange={(e) => setInStockOnly(e.target.checked)}
+                        className="h-4 w-4 accent-[#f04438]"
+                      />
+                      In stock only
+                    </label>
+                  </div>
+                  {activeFilterCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearAllFilters}
+                      className="self-start text-[11px] font-bold text-[#f04438] hover:underline"
+                    >
+                      Clear all filters
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="p-5">
@@ -964,10 +1093,10 @@ export const Marketplace: React.FC = () => {
               <div className="flex flex-col items-center justify-center border border-dashed border-gray-200 rounded p-16 text-center">
                 <Search size={40} className="text-gray-300 mb-4" />
                 <p className="font-black text-[#151515] text-lg">No products found</p>
-                <p className="mt-2 text-sm text-[#777]">Try a different category or search term.</p>
+                <p className="mt-2 text-sm text-[#777]">Try a different category, price range, or search term.</p>
                 <button
                   type="button"
-                  onClick={() => { setActiveCategory('all'); setQuery(''); setActiveTab('featured'); }}
+                  onClick={clearAllFilters}
                   className="mt-5 h-10 rounded bg-[#f04438] px-6 text-[11px] font-black text-white transition-colors hover:bg-[#c0392b]"
                 >
                   Clear filters
