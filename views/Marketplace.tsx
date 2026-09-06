@@ -90,11 +90,36 @@ const SkeletonCard: React.FC = () => (
 const ProductModal: React.FC<{
   product: DropshipperProduct;
   onClose: () => void;
-  onAddToCart: (id: string) => void;
-  onBuyNow: (id: string) => void;
-}> = ({ product, onClose, onAddToCart, onBuyNow }) => {
+  onAddToCart: (id: string, variant?: { id: string; label: string }) => void;
+  onBuyNow: (id: string, variant?: { id: string; label: string }) => void;
+  onSubmitReview: (productId: string, review: { author: string; rating: number; comment: string }) => void;
+  currentUserName?: string;
+}> = ({ product, onClose, onAddToCart, onBuyNow, onSubmitReview, currentUserName }) => {
   const reviews = product.product.reviews || [];
   const avgRating = computeAvgRating(reviews);
+  const variants = product.product.variants || [];
+  const [selectedVariantId, setSelectedVariantId] = useState<string>(variants[0]?.id ?? '');
+  const selectedVariant = variants.find((v) => v.id === selectedVariantId);
+
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewAuthor, setReviewAuthor] = useState(currentUserName ?? '');
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+
+  const handleSubmitReview = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewComment.trim()) return;
+    onSubmitReview(product.product.id, {
+      author: reviewAuthor.trim() || 'Anonymous',
+      rating: reviewRating,
+      comment: reviewComment.trim(),
+    });
+    setReviewComment('');
+    setReviewSubmitted(true);
+  };
+
+  const canAddToCart = variants.length === 0 || !!selectedVariant;
+  const variantForCart = selectedVariant ? { id: selectedVariant.id, label: selectedVariant.label } : undefined;
 
   return (
     <div
@@ -138,21 +163,53 @@ const ProductModal: React.FC<{
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <strong className="text-2xl font-black text-[#f04438]">{formatMoney(product.sellingPrice)}</strong>
-              <span className="text-xs text-[#777]">{product.product.stockQty} in stock</span>
+              <strong className="text-2xl font-black text-[#f04438]">
+                {formatMoney(product.sellingPrice + (selectedVariant?.priceAdjustment ?? 0))}
+              </strong>
+              <span className="text-xs text-[#777]">
+                {selectedVariant ? selectedVariant.stockQty : product.product.stockQty} in stock
+              </span>
             </div>
+
+            {variants.length > 0 && (
+              <div>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-[#777]">
+                  Options
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {variants.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setSelectedVariantId(v.id)}
+                      disabled={v.stockQty <= 0}
+                      className={`h-9 rounded border px-3 text-[11px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                        selectedVariantId === v.id
+                          ? 'border-[#f04438] bg-[#f04438]/10 text-[#f04438]'
+                          : 'border-gray-200 text-[#555] hover:border-gray-300'
+                      }`}
+                    >
+                      {v.label}{v.stockQty <= 0 ? ' (out of stock)' : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => { onAddToCart(product.id); onClose(); }}
-                className="h-11 rounded border border-[#151515] bg-white px-3 text-[11px] font-black text-[#151515] transition-colors hover:bg-gray-50"
+                disabled={!canAddToCart}
+                onClick={() => { onAddToCart(product.id, variantForCart); onClose(); }}
+                className="h-11 rounded border border-[#151515] bg-white px-3 text-[11px] font-black text-[#151515] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Add to Cart
               </button>
               <button
                 type="button"
-                onClick={() => { onBuyNow(product.id); onClose(); }}
-                className="h-11 rounded border border-[#f04438] bg-[#f04438] px-3 text-[11px] font-black text-white transition-colors hover:bg-[#c0392b]"
+                disabled={!canAddToCart}
+                onClick={() => { onBuyNow(product.id, variantForCart); onClose(); }}
+                className="h-11 rounded border border-[#f04438] bg-[#f04438] px-3 text-[11px] font-black text-white transition-colors hover:bg-[#c0392b] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Buy Now
               </button>
@@ -160,10 +217,11 @@ const ProductModal: React.FC<{
           </div>
         </div>
 
-        {reviews.length > 0 && (
-          <div className="border-t border-[#ededed] p-6">
-            <h3 className="mb-4 text-[15px] font-black text-[#151515]">Customer Reviews</h3>
-            <div className="space-y-4">
+        <div className="border-t border-[#ededed] p-6">
+          <h3 className="mb-4 text-[15px] font-black text-[#151515]">Customer Reviews</h3>
+
+          {reviews.length > 0 && (
+            <div className="mb-6 space-y-4">
               {reviews.map((review) => (
                 <div key={review.id} className="border-b border-[#f0f0f0] pb-4 last:border-0 last:pb-0">
                   <div className="flex items-center justify-between gap-3">
@@ -171,14 +229,58 @@ const ProductModal: React.FC<{
                       <StarDisplay rating={review.rating} size={12} />
                       <span className="text-[12px] font-black text-[#151515]">{review.author}</span>
                     </div>
-                    <span className="text-[10px] text-[#aaa]">{review.date}</span>
+                    <span className="text-[10px] text-[#aaa]">{new Date(review.date).toLocaleDateString()}</span>
                   </div>
                   <p className="mt-1.5 text-[12px] leading-relaxed text-[#555]">{review.comment}</p>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+
+          {reviewSubmitted ? (
+            <p className="rounded bg-green-50 px-3 py-2.5 text-[12px] font-bold text-green-700">
+              Thanks — your review has been posted.
+            </p>
+          ) : (
+            <form onSubmit={handleSubmitReview} className="space-y-3 rounded border border-gray-100 bg-[#fafafa] p-4">
+              <p className="text-[12px] font-black text-[#151515]">Write a review</p>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setReviewRating(n)}
+                    aria-label={`Rate ${n} star${n !== 1 ? 's' : ''}`}
+                    className="p-0.5"
+                  >
+                    <Star size={20} fill={n <= reviewRating ? '#f5a524' : 'none'} stroke={n <= reviewRating ? '#f5a524' : '#ccc'} strokeWidth={1.5} />
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                placeholder="Your name (optional)"
+                value={reviewAuthor}
+                onChange={(e) => setReviewAuthor(e.target.value)}
+                className="w-full h-9 rounded border border-gray-200 px-3 text-[12px] focus:outline-none focus:border-[#f04438]"
+              />
+              <textarea
+                required
+                rows={3}
+                placeholder="Share your experience with this product…"
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                className="w-full rounded border border-gray-200 px-3 py-2 text-[12px] focus:outline-none focus:border-[#f04438]"
+              />
+              <button
+                type="submit"
+                className="h-9 rounded bg-[#151515] px-4 text-[11px] font-black text-white transition-colors hover:bg-[#f04438]"
+              >
+                Submit Review
+              </button>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -267,10 +369,14 @@ const ProductCard: React.FC<{
         </div>
         <button
           type="button"
-          onClick={() => onAddToCart(product.id)}
+          onClick={() => {
+            // Variants need to be picked in the detail modal before adding to cart.
+            if (product.product.variants.length > 0) onOpenDetail(product);
+            else onAddToCart(product.id);
+          }}
           className="mt-3 w-full h-9 rounded bg-[#151515] text-[11px] font-black text-white transition-colors hover:bg-[#f04438]"
         >
-          Add to Cart
+          {product.product.variants.length > 0 ? 'Select Options' : 'Add to Cart'}
         </button>
       </div>
     </article>
@@ -287,7 +393,8 @@ export const Marketplace: React.FC = () => {
     submitCheckout,
     appliedPromo,
     applyPromoCode,
-    clearPromo
+    clearPromo,
+    addProductReview
   } = useGlobalStore();
 
   const { showToast } = useToast();
@@ -381,7 +488,13 @@ export const Marketplace: React.FC = () => {
       const item = publishedProducts.find((p) => p.id === line.dropshipperProductId);
       return item ? { ...line, item } : null;
     })
-    .filter(Boolean) as Array<{ dropshipperProductId: string; quantity: number; item: DropshipperProduct }>;
+    .filter(Boolean) as Array<{
+      dropshipperProductId: string;
+      variantId?: string;
+      variantLabel?: string;
+      quantity: number;
+      item: DropshipperProduct;
+    }>;
 
   const cartCount = cartLines.reduce((sum, l) => sum + l.quantity, 0);
   const cartSubtotal = cartLines.reduce((sum, l) => sum + l.item.sellingPrice * l.quantity, 0);
@@ -389,12 +502,16 @@ export const Marketplace: React.FC = () => {
   const promoDiscount = appliedPromo ? cartSubtotal * appliedPromo.discount : 0;
   const cartTotal = cartSubtotal + deliveryFee - promoDiscount;
 
-  const handleAddToCart = (id: string) => {
-    addToCart(id);
+  const handleAddToCart = (id: string, variant?: { id: string; label: string }) => {
+    addToCart(id, variant);
     setCartOpen(true);
     showToast('Added to cart!', 'success');
   };
-  const handleBuyNow = (id: string) => { addToCart(id); setCartOpen(true); setCheckoutOpen(true); };
+  const handleBuyNow = (id: string, variant?: { id: string; label: string }) => {
+    addToCart(id, variant);
+    setCartOpen(true);
+    setCheckoutOpen(true);
+  };
 
   const handleApplyPromo = () => {
     setPromoError('');
@@ -1111,6 +1228,8 @@ export const Marketplace: React.FC = () => {
           onClose={() => setDetailProduct(null)}
           onAddToCart={handleAddToCart}
           onBuyNow={handleBuyNow}
+          onSubmitReview={addProductReview}
+          currentUserName={profile?.fullName}
         />
       )}
 
@@ -1139,23 +1258,26 @@ export const Marketplace: React.FC = () => {
                 </div>
               ) : (
                 cartLines.map((line) => (
-                  <div key={line.dropshipperProductId} className="grid grid-cols-[76px_1fr] gap-3 rounded border border-gray-200 p-3">
+                  <div key={`${line.dropshipperProductId}-${line.variantId ?? ''}`} className="grid grid-cols-[76px_1fr] gap-3 rounded border border-gray-200 p-3">
                     <img src={line.item.product.images[0]} alt={line.item.product.name} className="h-20 w-full bg-gray-100 object-contain p-2 rounded" />
                     <div className="min-w-0">
                       <div className="flex items-start justify-between gap-3">
                         <h3 className="line-clamp-2 text-sm font-black leading-tight">{line.item.product.name}</h3>
-                        <button type="button" onClick={() => removeFromCart(line.dropshipperProductId)} className="text-gray-400 hover:text-red-600">
+                        <button type="button" onClick={() => removeFromCart(line.dropshipperProductId, line.variantId)} className="text-gray-400 hover:text-red-600">
                           <X size={15} />
                         </button>
                       </div>
+                      {line.variantLabel && (
+                        <p className="text-[11px] font-semibold text-[#999]">{line.variantLabel}</p>
+                      )}
                       <p className="mt-1 text-xs font-bold text-[#777]">{formatMoney(line.item.sellingPrice)}</p>
                       <div className="mt-3 flex items-center justify-between">
                         <div className="inline-flex items-center overflow-hidden rounded border border-gray-200">
-                          <button type="button" onClick={() => updateCartQuantity(line.dropshipperProductId, line.quantity - 1)} className="grid h-8 w-8 place-items-center hover:bg-gray-50">
+                          <button type="button" onClick={() => updateCartQuantity(line.dropshipperProductId, line.quantity - 1, line.variantId)} className="grid h-8 w-8 place-items-center hover:bg-gray-50">
                             <Minus size={14} />
                           </button>
                           <span className="grid h-8 w-9 place-items-center border-x border-gray-200 text-xs font-black">{line.quantity}</span>
-                          <button type="button" onClick={() => updateCartQuantity(line.dropshipperProductId, line.quantity + 1)} className="grid h-8 w-8 place-items-center hover:bg-gray-50">
+                          <button type="button" onClick={() => updateCartQuantity(line.dropshipperProductId, line.quantity + 1, line.variantId)} className="grid h-8 w-8 place-items-center hover:bg-gray-50">
                             <Plus size={14} />
                           </button>
                         </div>

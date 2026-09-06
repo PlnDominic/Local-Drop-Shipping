@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
+import type { ProductVariant } from '../store/globalStore';
 import { useAuth } from '../lib/auth/AuthProvider';
 import {
   Package,
@@ -11,19 +12,72 @@ import {
   Search,
   MapPin,
   CheckCircle2,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  UploadCloud,
+  Download,
+  AlertTriangle,
 } from 'lucide-react';
 
 const formatMoney = (amount: number) =>
   `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
-type Tab = 'products' | 'upload' | 'orders';
+type Tab = 'products' | 'upload' | 'bulk' | 'orders';
+
+// New-product form's working shape for a not-yet-saved variant row.
+type DraftVariant = { label: string; skuSuffix: string; priceAdjustment: string; stockQty: string };
+
+const emptyDraftVariant = (): DraftVariant => ({ label: '', skuSuffix: '', priceAdjustment: '', stockQty: '' });
+
+const BULK_IMPORT_TEMPLATE =
+  'name,description,category,costPrice,suggestedPrice,stockQty,sku,imageUrl\n' +
+  'Leather Sandals,Handmade leather sandals,Fashion,80,120,40,LDR-SAN,https://example.com/sandal.jpg\n';
+
+interface BulkRow {
+  name: string;
+  description: string;
+  categoryId: string;
+  costPrice: number;
+  suggestedPrice: number;
+  stockQty: number;
+  sku: string;
+  imageUrl: string;
+  error?: string;
+}
+
+// Minimal CSV line splitter: handles quoted fields containing commas.
+function splitCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { cur += ch; }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      fields.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  fields.push(cur);
+  return fields.map((f) => f.trim());
+}
 
 export const SupplierDashboard: React.FC = () => {
   const {
     products,
     orders,
     addSupplierProduct,
+    addSupplierProductsBulk,
     updateSupplierProductStock,
+    updateVariantStock,
     fulfillOrder,
     shipOrder,
     categories,
@@ -37,6 +91,7 @@ export const SupplierDashboard: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<Tab>('products');
   const [query, setQuery] = useState('');
+  const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
 
   // New product form state
   const [name, setName] = useState('');
@@ -47,6 +102,12 @@ export const SupplierDashboard: React.FC = () => {
   const [categoryId, setCategoryId] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [sku, setSku] = useState('');
+  const [draftVariants, setDraftVariants] = useState<DraftVariant[]>([]);
+
+  // Bulk import state
+  const [csvText, setCsvText] = useState('');
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
+  const [bulkError, setBulkError] = useState('');
 
   const supplierProducts = products
     .filter((p) => p.supplierId === uid)
@@ -57,6 +118,16 @@ export const SupplierDashboard: React.FC = () => {
 
   const handleProductUpload = (e: React.FormEvent) => {
     e.preventDefault();
+    const variants: ProductVariant[] = draftVariants
+      .filter((v) => v.label.trim())
+      .map((v, idx) => ({
+        id: `variant-${Date.now()}-${idx}`,
+        label: v.label.trim(),
+        skuSuffix: v.skuSuffix.trim(),
+        priceAdjustment: parseFloat(v.priceAdjustment) || 0,
+        stockQty: parseInt(v.stockQty) || 0,
+      }));
+
     addSupplierProduct({
       categoryId,
       name,
@@ -68,6 +139,7 @@ export const SupplierDashboard: React.FC = () => {
       sku: sku || `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
       isActive: true,
       reviews: [],
+      variants,
     });
     setName('');
     setDescription('');
@@ -76,6 +148,7 @@ export const SupplierDashboard: React.FC = () => {
     setStockQty('');
     setImageUrl('');
     setSku('');
+    setDraftVariants([]);
     setActiveTab('products');
   };
 
@@ -84,9 +157,107 @@ export const SupplierDashboard: React.FC = () => {
     if (!isNaN(qty) && qty >= 0) updateSupplierProductStock(pId, qty);
   };
 
+  const addDraftVariantRow = () => setDraftVariants((v) => [...v, emptyDraftVariant()]);
+  const removeDraftVariantRow = (idx: number) =>
+    setDraftVariants((v) => v.filter((_, i) => i !== idx));
+  const updateDraftVariantRow = (idx: number, field: keyof DraftVariant, value: string) =>
+    setDraftVariants((v) => v.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
+
+  // ── Bulk import ──────────────────────────────────────────────────────────
+  const handleDownloadTemplate = () => {
+    const blob = new Blob([BULK_IMPORT_TEMPLATE], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'product-import-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCsvFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => setCsvText(String(reader.result ?? ''));
+    reader.readAsText(file);
+  };
+
+  const parseCsv = () => {
+    setBulkError('');
+    const lines = csvText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length < 2) {
+      setBulkError('Add a header row plus at least one product row.');
+      setBulkRows([]);
+      return;
+    }
+    const header = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
+    const required = ['name', 'costprice', 'suggestedprice', 'stockqty'];
+    const missing = required.filter((r) => !header.includes(r));
+    if (missing.length > 0) {
+      setBulkError(`Missing required column(s): ${missing.join(', ')}`);
+      setBulkRows([]);
+      return;
+    }
+
+    const idx = (col: string) => header.indexOf(col);
+    const rows: BulkRow[] = lines.slice(1).map((line) => {
+      const cells = splitCsvLine(line);
+      const get = (col: string) => (idx(col) >= 0 ? cells[idx(col)] ?? '' : '');
+      const categoryName = get('category');
+      const category = categories.find(
+        (c) => c.name.toLowerCase() === categoryName.toLowerCase() || c.slug === categoryName.toLowerCase(),
+      );
+      const rowName = get('name');
+      const cost = parseFloat(get('costprice'));
+      const suggested = parseFloat(get('suggestedprice'));
+      const stock = parseInt(get('stockqty'));
+
+      let error: string | undefined;
+      if (!rowName) error = 'Missing product name';
+      else if (isNaN(cost) || cost < 0) error = 'Invalid cost price';
+      else if (isNaN(suggested) || suggested < 0) error = 'Invalid suggested price';
+      else if (isNaN(stock) || stock < 0) error = 'Invalid stock quantity';
+      else if (categoryName && !category) error = `Unknown category "${categoryName}"`;
+
+      return {
+        name: rowName,
+        description: get('description'),
+        categoryId: category?.id ?? '',
+        costPrice: isNaN(cost) ? 0 : cost,
+        suggestedPrice: isNaN(suggested) ? 0 : suggested,
+        stockQty: isNaN(stock) ? 0 : stock,
+        sku: get('sku') || `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
+        imageUrl: get('imageurl'),
+        error,
+      };
+    });
+    setBulkRows(rows);
+  };
+
+  const validBulkRows = bulkRows.filter((r) => !r.error);
+
+  const handleBulkImport = () => {
+    if (validBulkRows.length === 0) return;
+    const count = addSupplierProductsBulk(
+      validBulkRows.map((r) => ({
+        categoryId: r.categoryId,
+        name: r.name,
+        description: r.description,
+        images: r.imageUrl ? [r.imageUrl] : [],
+        costPrice: r.costPrice,
+        suggestedPrice: r.suggestedPrice,
+        stockQty: r.stockQty,
+        sku: r.sku,
+        isActive: true,
+      })),
+    );
+    setCsvText('');
+    setBulkRows([]);
+    if (count > 0) setActiveTab('products');
+  };
+
   const tabs: { id: Tab; label: string; icon: typeof Package; badge?: number }[] = [
     { id: 'products', label: 'Products', icon: Package },
     { id: 'upload', label: 'Upload Item', icon: Plus },
+    { id: 'bulk', label: 'Bulk Import', icon: UploadCloud },
     { id: 'orders', label: 'Fulfillment', icon: Truck, badge: pendingCount },
   ];
 
@@ -183,34 +354,84 @@ export const SupplierDashboard: React.FC = () => {
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {supplierProducts.map((p) => (
-                  <div key={p.id} className="flex flex-wrap items-center gap-4 p-4 hover:bg-[#fafafa] transition-colors">
-                    <div className="h-14 w-14 flex-shrink-0 rounded bg-[#f7f7f7] grid place-items-center">
-                      <img src={p.images[0]} alt="" className="h-full w-full object-contain p-1.5 mix-blend-multiply" />
+                {supplierProducts.map((p) => {
+                  const hasVariants = p.variants.length > 0;
+                  const isExpanded = expandedProductId === p.id;
+                  return (
+                    <div key={p.id}>
+                      <div className="flex flex-wrap items-center gap-4 p-4 hover:bg-[#fafafa] transition-colors">
+                        <div className="h-14 w-14 flex-shrink-0 rounded bg-[#f7f7f7] grid place-items-center">
+                          <img src={p.images[0]} alt="" className="h-full w-full object-contain p-1.5 mix-blend-multiply" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="line-clamp-1 text-[13px] font-bold text-[#151515]">{p.name}</h3>
+                          <span className="text-[10px] text-[#999]">SKU {p.sku || '—'}</span>
+                          {hasVariants && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedProductId(isExpanded ? null : p.id)}
+                              className="ml-2 inline-flex items-center gap-0.5 text-[10px] font-bold text-[#f04438] hover:underline"
+                            >
+                              {p.variants.length} variant{p.variants.length !== 1 ? 's' : ''}
+                              {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                            </button>
+                          )}
+                        </div>
+                        <div className="text-right min-w-[90px]">
+                          <p className="text-[9px] uppercase tracking-wider text-[#999] font-bold">Wholesale</p>
+                          <p className="text-[13px] font-black text-[#f04438]">{formatMoney(p.costPrice)}</p>
+                        </div>
+                        <div className="text-right min-w-[90px]">
+                          <p className="text-[9px] uppercase tracking-wider text-[#999] font-bold">Retail</p>
+                          <p className="text-[13px] font-bold text-[#555]">{formatMoney(p.suggestedPrice)}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            value={p.stockQty}
+                            onChange={(e) => handleStockUpdate(p.id, e.target.value)}
+                            disabled={hasVariants}
+                            title={hasVariants ? 'Managed per-variant below' : undefined}
+                            className="w-20 h-9 rounded border border-gray-200 px-2 text-[12px] font-black text-[#151515] focus:outline-none focus:border-[#f04438] disabled:bg-gray-50 disabled:text-gray-400"
+                          />
+                          <span className="text-[10px] text-[#999]">units</span>
+                        </div>
+                      </div>
+
+                      {hasVariants && isExpanded && (
+                        <div className="bg-[#fafafa] px-4 pb-4">
+                          <div className="rounded border border-gray-200 bg-white divide-y divide-gray-100">
+                            {p.variants.map((v) => (
+                              <div key={v.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[12px] font-bold text-[#151515]">{v.label}</p>
+                                  <p className="text-[10px] text-[#999]">
+                                    SKU {p.sku}{v.skuSuffix}
+                                    {v.priceAdjustment !== 0 && (
+                                      <> · {v.priceAdjustment > 0 ? '+' : ''}{formatMoney(v.priceAdjustment)}</>
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="number"
+                                    value={v.stockQty}
+                                    onChange={(e) => {
+                                      const qty = parseInt(e.target.value);
+                                      if (!isNaN(qty) && qty >= 0) updateVariantStock(p.id, v.id, qty);
+                                    }}
+                                    className="w-20 h-8 rounded border border-gray-200 px-2 text-[11px] font-black text-[#151515] focus:outline-none focus:border-[#f04438]"
+                                  />
+                                  <span className="text-[10px] text-[#999]">units</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="line-clamp-1 text-[13px] font-bold text-[#151515]">{p.name}</h3>
-                      <span className="text-[10px] text-[#999]">SKU {p.sku || '—'}</span>
-                    </div>
-                    <div className="text-right min-w-[90px]">
-                      <p className="text-[9px] uppercase tracking-wider text-[#999] font-bold">Wholesale</p>
-                      <p className="text-[13px] font-black text-[#f04438]">{formatMoney(p.costPrice)}</p>
-                    </div>
-                    <div className="text-right min-w-[90px]">
-                      <p className="text-[9px] uppercase tracking-wider text-[#999] font-bold">Retail</p>
-                      <p className="text-[13px] font-bold text-[#555]">{formatMoney(p.suggestedPrice)}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        value={p.stockQty}
-                        onChange={(e) => handleStockUpdate(p.id, e.target.value)}
-                        className="w-20 h-9 rounded border border-gray-200 px-2 text-[12px] font-black text-[#151515] focus:outline-none focus:border-[#f04438]"
-                      />
-                      <span className="text-[10px] text-[#999]">units</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -267,11 +488,187 @@ export const SupplierDashboard: React.FC = () => {
                   <label className={labelClass}>Description</label>
                   <textarea rows={4} required placeholder="Dimensions, material, region made…" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full rounded border border-gray-200 px-3 py-2 text-[12px] focus:outline-none focus:border-[#f04438]" />
                 </div>
+              </div>
+
+              {/* ── Variants ── */}
+              <div className="md:col-span-2 border-t border-gray-100 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-[12px] font-black text-[#151515]">Variants (optional)</p>
+                    <p className="text-[10px] text-[#888]">Add size/color options with their own stock and price adjustment.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addDraftVariantRow}
+                    className="h-8 rounded border border-gray-200 px-3 text-[11px] font-bold text-[#151515] hover:bg-gray-50 flex items-center gap-1"
+                  >
+                    <Plus size={13} /> Add variant
+                  </button>
+                </div>
+
+                {draftVariants.length > 0 && (
+                  <div className="space-y-2">
+                    {draftVariants.map((v, idx) => (
+                      <div key={idx} className="grid grid-cols-[1fr_1fr_90px_90px_36px] gap-2 items-center">
+                        <input
+                          type="text"
+                          placeholder="e.g. Red / Large"
+                          value={v.label}
+                          onChange={(e) => updateDraftVariantRow(idx, 'label', e.target.value)}
+                          className={`${inputClass} h-9`}
+                        />
+                        <input
+                          type="text"
+                          placeholder="SKU suffix e.g. -RED-L"
+                          value={v.skuSuffix}
+                          onChange={(e) => updateDraftVariantRow(idx, 'skuSuffix', e.target.value)}
+                          className={`${inputClass} h-9`}
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="±price"
+                          value={v.priceAdjustment}
+                          onChange={(e) => updateDraftVariantRow(idx, 'priceAdjustment', e.target.value)}
+                          className={`${inputClass} h-9`}
+                        />
+                        <input
+                          type="number"
+                          placeholder="stock"
+                          value={v.stockQty}
+                          onChange={(e) => updateDraftVariantRow(idx, 'stockQty', e.target.value)}
+                          className={`${inputClass} h-9`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeDraftVariantRow(idx)}
+                          className="h-9 w-9 grid place-items-center rounded border border-gray-200 text-gray-400 hover:text-[#f04438] hover:border-[#f04438]"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
                 <button type="submit" className="w-full h-11 rounded bg-[#151515] text-[12px] font-black text-white hover:bg-[#f04438] transition-colors flex items-center justify-center gap-1.5">
                   <Plus size={16} /> List wholesale item
                 </button>
               </div>
             </form>
+          </section>
+        )}
+
+        {/* ── BULK IMPORT ── */}
+        {activeTab === 'bulk' && (
+          <section className="bg-white rounded border border-gray-100 overflow-hidden">
+            <div className="border-b border-gray-100 px-4 py-4 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-[15px] font-black text-[#151515]">Bulk Import Products</h2>
+                <p className="text-[11px] text-[#888]">Paste or upload a CSV to list many products at once.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                className="h-9 rounded border border-gray-200 px-3 text-[11px] font-bold text-[#151515] hover:bg-gray-50 flex items-center gap-1.5 flex-shrink-0"
+              >
+                <Download size={13} /> CSV template
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className={labelClass}>Upload CSV file</label>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleCsvFile(file);
+                  }}
+                  className="block w-full text-[11px] text-[#555] file:mr-3 file:h-9 file:rounded file:border-0 file:bg-[#151515] file:px-3 file:text-[11px] file:font-black file:text-white hover:file:bg-[#f04438]"
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>Or paste CSV</label>
+                <textarea
+                  rows={6}
+                  placeholder={BULK_IMPORT_TEMPLATE}
+                  value={csvText}
+                  onChange={(e) => setCsvText(e.target.value)}
+                  className="w-full rounded border border-gray-200 px-3 py-2 text-[11px] font-mono focus:outline-none focus:border-[#f04438]"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={parseCsv}
+                  disabled={!csvText.trim()}
+                  className="h-10 rounded bg-[#151515] px-5 text-[11px] font-black text-white hover:bg-[#f04438] transition-colors disabled:opacity-40"
+                >
+                  Preview
+                </button>
+                {bulkError && (
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-[#f04438]">
+                    <AlertTriangle size={13} /> {bulkError}
+                  </span>
+                )}
+              </div>
+
+              {bulkRows.length > 0 && (
+                <div>
+                  <div className="rounded border border-gray-200 overflow-x-auto">
+                    <table className="w-full text-[11px]">
+                      <thead className="bg-[#f7f7f7] text-[10px] uppercase tracking-wider text-[#999]">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-bold">Name</th>
+                          <th className="text-right px-3 py-2 font-bold">Cost</th>
+                          <th className="text-right px-3 py-2 font-bold">Retail</th>
+                          <th className="text-right px-3 py-2 font-bold">Stock</th>
+                          <th className="text-left px-3 py-2 font-bold">SKU</th>
+                          <th className="text-left px-3 py-2 font-bold">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {bulkRows.map((r, idx) => (
+                          <tr key={idx} className={r.error ? 'bg-red-50/50' : undefined}>
+                            <td className="px-3 py-2 font-semibold text-[#151515]">{r.name || '—'}</td>
+                            <td className="px-3 py-2 text-right">{formatMoney(r.costPrice)}</td>
+                            <td className="px-3 py-2 text-right">{formatMoney(r.suggestedPrice)}</td>
+                            <td className="px-3 py-2 text-right">{r.stockQty}</td>
+                            <td className="px-3 py-2 text-[#777]">{r.sku}</td>
+                            <td className="px-3 py-2">
+                              {r.error ? (
+                                <span className="text-[#f04438] font-bold">{r.error}</span>
+                              ) : (
+                                <span className="text-green-600 font-bold">Ready</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between">
+                    <p className="text-[11px] text-[#777]">
+                      {validBulkRows.length} of {bulkRows.length} row{bulkRows.length !== 1 ? 's' : ''} ready to import.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleBulkImport}
+                      disabled={validBulkRows.length === 0}
+                      className="h-10 rounded bg-[#151515] px-5 text-[11px] font-black text-white hover:bg-[#f04438] transition-colors disabled:opacity-40 flex items-center gap-1.5"
+                    >
+                      <UploadCloud size={14} /> Import {validBulkRows.length || ''} product{validBulkRows.length !== 1 ? 's' : ''}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </section>
         )}
 

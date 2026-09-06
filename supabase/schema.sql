@@ -145,11 +145,37 @@ create table if not exists public.payments (
   updated_at timestamptz not null default now()
 );
 
+-- Per-variant stock/pricing under a product (e.g. size/color combinations).
+create table if not exists public.product_variants (
+  id               uuid primary key default gen_random_uuid(),
+  product_id       uuid not null references public.products(id) on delete cascade,
+  label            text not null,
+  sku_suffix       text not null default '',
+  price_adjustment numeric(12,2) not null default 0,
+  stock_qty        integer not null default 0,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+-- Customer/dropshipper reviews left against a supplier's product.
+create table if not exists public.product_reviews (
+  id          uuid primary key default gen_random_uuid(),
+  product_id  uuid not null references public.products(id) on delete cascade,
+  user_id     uuid references public.users(id) on delete set null,
+  author_name text not null default 'Anonymous',
+  rating      integer not null check (rating between 1 and 5),
+  comment     text not null default '',
+  created_at  timestamptz not null default now(),
+  unique (product_id, user_id)
+);
+
 create index if not exists idx_products_supplier on public.products(supplier_id);
 create index if not exists idx_products_active on public.products(is_active);
 create index if not exists idx_dp_products_pub on public.dropshipper_products(is_published);
 create index if not exists idx_orders_dropshipper on public.orders(dropshipper_id);
 create index if not exists idx_wallet_tx_user on public.wallet_transactions(user_id);
+create index if not exists idx_product_variants_product on public.product_variants(product_id);
+create index if not exists idx_product_reviews_product on public.product_reviews(product_id);
 
 -- ── Auth → profile provisioning ─────────────────────────────────────────────
 -- On signup, create the public profile row and an empty wallet.
@@ -203,6 +229,8 @@ alter table public.orders               enable row level security;
 alter table public.order_items          enable row level security;
 alter table public.wallets              enable row level security;
 alter table public.wallet_transactions  enable row level security;
+alter table public.product_variants     enable row level security;
+alter table public.product_reviews      enable row level security;
 
 -- ── Read policies ───────────────────────────────────────────────────────────
 drop policy if exists "categories are public" on public.categories;
@@ -211,6 +239,12 @@ create policy "categories are public" on public.categories for select using (tru
 drop policy if exists "active products are public" on public.products;
 create policy "active products are public" on public.products for select
   using (is_active = true or supplier_id = auth.uid());
+
+drop policy if exists "variants are public" on public.product_variants;
+create policy "variants are public" on public.product_variants for select using (true);
+
+drop policy if exists "reviews are public" on public.product_reviews;
+create policy "reviews are public" on public.product_reviews for select using (true);
 
 drop policy if exists "published store items are public" on public.dropshipper_products;
 create policy "published store items are public" on public.dropshipper_products for select
@@ -266,6 +300,33 @@ create policy "supplier manages own products" on public.products for all
 drop policy if exists "dropshipper manages own store items" on public.dropshipper_products;
 create policy "dropshipper manages own store items" on public.dropshipper_products for all
   using (dropshipper_id = auth.uid()) with check (dropshipper_id = auth.uid());
+
+drop policy if exists "supplier manages own product variants" on public.product_variants;
+create policy "supplier manages own product variants" on public.product_variants for all
+  using (
+    exists (
+      select 1 from public.products p
+      where p.id = product_variants.product_id and p.supplier_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.products p
+      where p.id = product_variants.product_id and p.supplier_id = auth.uid()
+    )
+  );
+
+drop policy if exists "authenticated users write own review" on public.product_reviews;
+create policy "authenticated users write own review" on public.product_reviews for insert
+  with check (user_id = auth.uid());
+
+drop policy if exists "users manage own review" on public.product_reviews;
+create policy "users manage own review" on public.product_reviews for update
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "users delete own review" on public.product_reviews;
+create policy "users delete own review" on public.product_reviews for delete
+  using (user_id = auth.uid());
 
 -- NOTE: orders, wallets and wallet_transactions are intentionally NOT directly
 -- writable by clients. Sensitive writes go through the SECURITY DEFINER

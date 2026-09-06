@@ -46,6 +46,14 @@ export interface ProductReview {
   date: string;
 }
 
+export interface ProductVariant {
+  id: string;
+  label: string; // e.g. "Red / Large"
+  skuSuffix: string; // appended to the parent product's SKU, e.g. "-RED-L"
+  priceAdjustment: number; // added to costPrice/suggestedPrice; can be negative
+  stockQty: number;
+}
+
 export interface Product {
   id: string;
   supplierId: string;
@@ -61,6 +69,7 @@ export interface Product {
   isActive: boolean;
   createdAt: string;
   reviews: ProductReview[];
+  variants: ProductVariant[];
 }
 
 export interface DropshipperProduct {
@@ -77,6 +86,7 @@ export interface OrderItem {
   id: string;
   productId: string;
   productName: string;
+  variantLabel?: string;
   quantity: number;
   unitPrice: number; // what the customer paid
   costPrice: number; // what the supplier charges
@@ -180,20 +190,27 @@ interface AppState {
   // Cart State (Customer side)
   cart: {
     dropshipperProductId: string; // the imported item
+    variantId?: string;
+    variantLabel?: string;
     quantity: number;
   }[];
 
   // Actions
-  addToCart: (dropshipperProductId: string) => void;
-  removeFromCart: (dropshipperProductId: string) => void;
-  updateCartQuantity: (dropshipperProductId: string, qty: number) => void;
+  addToCart: (dropshipperProductId: string, variant?: { id: string; label: string }) => void;
+  removeFromCart: (dropshipperProductId: string, variantId?: string) => void;
+  updateCartQuantity: (dropshipperProductId: string, qty: number, variantId?: string) => void;
   clearCart: () => void;
 
   // Supplier Actions
   addSupplierProduct: (productData: Omit<Product, 'id' | 'supplierId' | 'supplierName' | 'createdAt'>) => void;
+  addSupplierProductsBulk: (rows: Omit<Product, 'id' | 'supplierId' | 'supplierName' | 'createdAt' | 'reviews' | 'variants'>[]) => number;
   updateSupplierProductStock: (productId: string, newQty: number) => void;
+  updateVariantStock: (productId: string, variantId: string, newQty: number) => void;
   fulfillOrder: (orderId: string) => void;
   shipOrder: (orderId: string) => void;
+
+  // Review Actions
+  addProductReview: (productId: string, review: { author: string; rating: number; comment: string }) => void;
 
   // Dropshipper Actions
   importProductToStore: (productId: string, sellingPrice: number, desc?: string) => void;
@@ -253,6 +270,7 @@ function mapProductRow(p: ProductDbRow): Product {
     isActive: p.is_active,
     createdAt: p.created_at,
     reviews: [],
+    variants: [],
   };
 }
 
@@ -376,27 +394,36 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   cart: [],
 
   // Cart operations
-  addToCart: (dropshipperProductId) => set((state) => {
-    const existing = state.cart.find(item => item.dropshipperProductId === dropshipperProductId);
+  addToCart: (dropshipperProductId, variant) => set((state) => {
+    const existing = state.cart.find(
+      (item) => item.dropshipperProductId === dropshipperProductId && item.variantId === variant?.id,
+    );
     if (existing) {
       return {
         cart: state.cart.map(item =>
-          item.dropshipperProductId === dropshipperProductId
+          item.dropshipperProductId === dropshipperProductId && item.variantId === variant?.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         )
       };
     }
-    return { cart: [...state.cart, { dropshipperProductId, quantity: 1 }] };
+    return {
+      cart: [
+        ...state.cart,
+        { dropshipperProductId, variantId: variant?.id, variantLabel: variant?.label, quantity: 1 },
+      ],
+    };
   }),
 
-  removeFromCart: (dropshipperProductId) => set((state) => ({
-    cart: state.cart.filter(item => item.dropshipperProductId !== dropshipperProductId)
+  removeFromCart: (dropshipperProductId, variantId) => set((state) => ({
+    cart: state.cart.filter(
+      item => !(item.dropshipperProductId === dropshipperProductId && item.variantId === variantId)
+    )
   })),
 
-  updateCartQuantity: (dropshipperProductId, qty) => set((state) => ({
+  updateCartQuantity: (dropshipperProductId, qty, variantId) => set((state) => ({
     cart: state.cart.map(item =>
-      item.dropshipperProductId === dropshipperProductId
+      item.dropshipperProductId === dropshipperProductId && item.variantId === variantId
         ? { ...item, quantity: Math.max(1, qty) }
         : item
     )
@@ -418,8 +445,35 @@ export const useGlobalStore = create<AppState>((set, get) => ({
     return { products: [newProduct, ...state.products] };
   }),
 
+  addSupplierProductsBulk: (rows) => {
+    const state = get();
+    const uid = state.currentUserId;
+    if (!uid || rows.length === 0) return 0;
+    const supplierName = state.supplierProfiles.find((s) => s.userId === uid)?.businessName ?? '';
+    const now = Date.now();
+    const newProducts: Product[] = rows.map((row, idx) => ({
+      ...row,
+      id: `local-${now}-${idx}`,
+      supplierId: uid,
+      supplierName,
+      createdAt: new Date().toISOString(),
+      reviews: [],
+      variants: [],
+    }));
+    set({ products: [...newProducts, ...state.products] });
+    return newProducts.length;
+  },
+
   updateSupplierProductStock: (productId, newQty) => set((state) => ({
     products: state.products.map(p => p.id === productId ? { ...p, stockQty: newQty } : p)
+  })),
+
+  updateVariantStock: (productId, variantId, newQty) => set((state) => ({
+    products: state.products.map(p =>
+      p.id === productId
+        ? { ...p, variants: p.variants.map(v => v.id === variantId ? { ...v, stockQty: newQty } : v) }
+        : p
+    )
   })),
 
   importProductToStore: (productId, sellingPrice, desc) => set((state) => {
@@ -458,6 +512,27 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   removeImportedProduct: (dropshipperProductId) => set((state) => ({
     dropshipperProducts: state.dropshipperProducts.filter(dp => dp.id !== dropshipperProductId)
   })),
+
+  addProductReview: (productId, review) => {
+    const rating = Math.max(1, Math.min(5, Math.round(review.rating)));
+    const newReview: ProductReview = {
+      id: `local-rev-${Date.now()}`,
+      author: review.author.trim() || 'Anonymous',
+      rating,
+      comment: review.comment.trim(),
+      date: new Date().toISOString(),
+    };
+    set((state) => ({
+      products: state.products.map(p =>
+        p.id === productId ? { ...p, reviews: [newReview, ...p.reviews] } : p
+      ),
+      dropshipperProducts: state.dropshipperProducts.map(dp =>
+        dp.productId === productId
+          ? { ...dp, product: { ...dp.product, reviews: [newReview, ...dp.product.reviews] } }
+          : dp
+      ),
+    }));
+  },
 
   withdrawFunds: (userId, amount, details) => {
     const state = get();
@@ -504,6 +579,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         id: `oi-${idx}-${Date.now()}`,
         productId: dpProd.productId,
         productName: dpProd.product.name,
+        variantLabel: cartItem.variantLabel,
         quantity: cartItem.quantity,
         unitPrice: dpProd.sellingPrice,
         costPrice: dpProd.product.costPrice,
