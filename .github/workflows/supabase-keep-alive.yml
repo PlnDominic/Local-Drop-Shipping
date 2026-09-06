@@ -22,7 +22,7 @@ jobs:
           node-version: 22
 
       - name: Install Supabase client
-        run: npm install @supabase/supabase-js@^2
+        run: npm install @supabase/supabase-js@^2 ws@^8
 
       - name: Ping Supabase
         env:

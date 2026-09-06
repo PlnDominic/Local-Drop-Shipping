@@ -18,6 +18,15 @@
 
 import { createClient } from '@supabase/supabase-js';
 
+// supabase-js always constructs a RealtimeClient, even though this script
+// only does plain REST reads, and that constructor throws on any runtime
+// without a global `WebSocket` (Node < 22). Polyfill it with the `ws`
+// package so this works regardless of which Node version actually runs it.
+if (typeof globalThis.WebSocket === 'undefined') {
+  const { default: WebSocket } = await import('ws');
+  globalThis.WebSocket = WebSocket;
+}
+
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
