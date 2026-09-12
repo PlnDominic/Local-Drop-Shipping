@@ -29,6 +29,14 @@ export interface DropshipperProfile {
   storeName: string;
   storeSlug: string;
   commissionRate: number;
+  // Storefront customization
+  themeColor: string;
+  bannerUrl: string;
+  tagline: string;
+  announcement: string;
+  whatsapp: string;
+  socialLinks: Record<string, string>;
+  featuredProductIds: string[];
 }
 
 export interface Category {
@@ -160,9 +168,13 @@ interface AppState {
   mobilePreview: boolean;
   setMobilePreview: (active: boolean) => void;
 
-  // Current signed-in user (resolved from Supabase Auth; null when logged out)
+   // Current signed-in user (resolved from Supabase Auth; null when logged out)
   currentUserId: string | null;
   setCurrentUserId: (id: string | null) => void;
+
+  // Dropshipper profile for the current user (null when not a dropshipper)
+  dropshipperProfile: DropshipperProfile | null;
+  setDropshipperProfile: (profile: DropshipperProfile | null) => void;
 
   // Data hydration from Supabase
   hydrated: boolean;
@@ -283,21 +295,19 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   currentUserId: null,
   setCurrentUserId: (id) => set({ currentUserId: id }),
 
+  dropshipperProfile: null,
+  setDropshipperProfile: (profile) => set({ dropshipperProfile: profile }),
+
   hydrated: false,
   hydrate: async () => {
     const uid = get().currentUserId;
     try {
-      const [catsRes, prodsRes, dpsRes] = await Promise.all([
+      const [catsRes, prodsRes] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
         supabase
           .from('products')
           .select('*, supplier_profiles(business_name)')
           .eq('is_active', true)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('dropshipper_products')
-          .select('*, products(*, supplier_profiles(business_name))')
-          .eq('is_published', true)
           .order('created_at', { ascending: false }),
       ]);
 
@@ -312,23 +322,23 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         mapProductRow(p as ProductDbRow),
       );
 
-      const dropshipperProducts: DropshipperProduct[] = (dpsRes.data ?? [])
-        .filter((d) => d.products)
-        .map((d) => ({
-          id: d.id,
-          dropshipperId: d.dropshipper_id,
-          productId: d.product_id,
-          product: mapProductRow(d.products as ProductDbRow),
-          sellingPrice: Number(d.custom_price),
-          customDescription: d.custom_description ?? (d.products as ProductDbRow).description,
-          isPublished: d.is_published,
-        }));
-
+      let dropshipperProducts: DropshipperProduct[] = [];
       let wallets: Record<string, Wallet> = {};
       let transactions: Transaction[] = [];
+      let dropshipperProfile: DropshipperProfile | null = null;
 
       if (uid) {
-        const [walletRes, txRes] = await Promise.all([
+        const [dpsRes, dpProfileRes, walletRes, txRes] = await Promise.all([
+          supabase
+            .from('dropshipper_products')
+            .select('*, products(*, supplier_profiles(business_name))')
+            .eq('dropshipper_id', uid)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('dropshipper_profiles')
+            .select('*')
+            .eq('id', uid)
+            .maybeSingle(),
           supabase.from('wallets').select('*').eq('user_id', uid).maybeSingle(),
           supabase
             .from('wallet_transactions')
@@ -337,6 +347,36 @@ export const useGlobalStore = create<AppState>((set, get) => ({
             .order('created_at', { ascending: false })
             .limit(50),
         ]);
+
+        dropshipperProducts = (dpsRes.data ?? [])
+          .filter((d) => d.products)
+          .map((d) => ({
+            id: d.id,
+            dropshipperId: d.dropshipper_id,
+            productId: d.product_id,
+            product: mapProductRow(d.products as ProductDbRow),
+            sellingPrice: Number(d.custom_price),
+            customDescription: d.custom_description ?? (d.products as ProductDbRow).description,
+            isPublished: d.is_published,
+          }));
+
+        const dp = dpProfileRes.data;
+        if (dp) {
+          dropshipperProfile = {
+            id: dp.id,
+            userId: dp.id,
+            storeName: dp.store_name ?? '',
+            storeSlug: dp.store_slug ?? '',
+            commissionRate: Number(dp.commission_rate ?? 0),
+            themeColor: dp.theme_color ?? '#f04438',
+            bannerUrl: dp.banner_url ?? '',
+            tagline: dp.tagline ?? '',
+            announcement: dp.announcement ?? '',
+            whatsapp: dp.whatsapp ?? '',
+            socialLinks: dp.social_links ?? {},
+            featuredProductIds: dp.featured_product_ids ?? [],
+          };
+        }
 
         const w = walletRes.data;
         wallets = {
@@ -359,7 +399,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         }));
       }
 
-      set({ categories, products, dropshipperProducts, wallets, transactions, hydrated: true });
+      set({ categories, products, dropshipperProducts, dropshipperProfile, wallets, transactions, hydrated: true });
     } catch {
       // Surface an empty (not fake) state if Supabase is unreachable.
       set({ hydrated: true });

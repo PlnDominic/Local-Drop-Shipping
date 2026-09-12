@@ -51,6 +51,7 @@ create table if not exists public.dropshipper_profiles (
   business_name   text not null default '',
   store_name      text,
   store_slug      text unique,
+  is_approved     boolean not null default false,
   description     text,
   logo_url        text,
   location        text,
@@ -58,6 +59,17 @@ create table if not exists public.dropshipper_profiles (
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
+-- Add column for tables created before this migration.
+alter table public.dropshipper_profiles add column if not exists is_approved boolean not null default false;
+
+-- ── Storefront customization columns ──
+alter table public.dropshipper_profiles add column if not exists theme_color text not null default '#f04438';
+alter table public.dropshipper_profiles add column if not exists banner_url text;
+alter table public.dropshipper_profiles add column if not exists tagline text;
+alter table public.dropshipper_profiles add column if not exists announcement text;
+alter table public.dropshipper_profiles add column if not exists whatsapp text;
+alter table public.dropshipper_profiles add column if not exists social_links jsonb not null default '{}';
+alter table public.dropshipper_profiles add column if not exists featured_product_ids uuid[] not null default '{}';
 
 create table if not exists public.products (
   id             uuid primary key default gen_random_uuid(),
@@ -178,26 +190,76 @@ create index if not exists idx_product_variants_product on public.product_varian
 create index if not exists idx_product_reviews_product on public.product_reviews(product_id);
 
 -- ── Auth → profile provisioning ─────────────────────────────────────────────
--- On signup, create the public profile row and an empty wallet.
+-- On signup, create the public profile row, an empty wallet, and role-specific
+-- profiles (dropshipper/supplier). For dropshippers a unique store_slug is
+-- auto-generated so /store/[storeSlug] is immediately usable.
+
+-- Generate a unique store_slug from a base name.
+create or replace function public.generate_store_slug(base_name text)
+returns text
+language plpgsql
+set search_path = public
+as $$
+declare
+  base    text;
+  slug    text;
+  counter int := 0;
+begin
+  base := lower(regexp_replace(coalesce(base_name, 'store'), '[^a-zA-Z0-9]+', '-', 'g'));
+  base := trim(both '-' from base);
+  if length(base) < 3 then base := base || '-store'; end if;
+  slug := base;
+  loop
+    if not exists (select 1 from public.dropshipper_profiles where store_slug = slug) then
+      return slug;
+    end if;
+    counter := counter + 1;
+    slug := base || '-' || counter;
+  end loop;
+end;
+$$;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_role text := coalesce(new.raw_user_meta_data->>'role', 'customer');
+  v_name text := coalesce(new.raw_user_meta_data->>'full_name', '');
+  v_slug text;
 begin
   insert into public.users (id, full_name, email, phone, role, is_verified)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'full_name', ''),
+    v_name,
     new.email,
     coalesce(new.raw_user_meta_data->>'phone', ''),
-    coalesce(new.raw_user_meta_data->>'role', 'customer'),
+    v_role,
     false
   )
   on conflict (id) do nothing;
 
   insert into public.wallets (user_id) values (new.id) on conflict (user_id) do nothing;
+
+  -- Auto-create a dropshipper profile with a unique store_slug
+  if v_role = 'dropshipper' then
+      v_slug := public.generate_store_slug(v_name);
+    insert into public.dropshipper_profiles (id, business_name, store_name, store_slug, is_approved)
+    values (new.id, v_name || ' Store', v_name || ' Store', v_slug, true)
+    on conflict (id) do update
+      set store_slug = excluded.store_slug
+      where dropshipper_profiles.store_slug is null;
+  end if;
+
+  -- Auto-create a supplier profile
+  if v_role = 'supplier' then
+    insert into public.supplier_profiles (id, business_name, is_approved)
+    values (new.id, v_name)
+    on conflict (id) do nothing;
+  end if;
+
   return new;
 end;
 $$;
@@ -485,3 +547,56 @@ $$;
 revoke all on function public.wallet_credit(uuid, numeric, text, text) from anon, authenticated;
 grant execute on function public.create_order(uuid, text, text, text, jsonb, text, numeric) to authenticated;
 grant execute on function public.wallet_withdraw(numeric, jsonb) to authenticated;
+grant execute on function public.generate_store_slug(text) to authenticated;
+
+-- ============================================================================
+-- Seed data (idempotent — safe to re-run)
+-- ============================================================================
+
+-- ── Categories ──
+insert into public.categories (id, name, slug, icon) values
+  ('a1111111-1111-1111-1111-111111111111', 'Electronics', 'electronics', 'Zap'),
+  ('a2222222-2222-2222-2222-222222222222', 'Fashion', 'fashion', 'Heart'),
+  ('a3333333-3333-3333-3333-333333333333', 'Home & Living', 'home', 'Package'),
+  ('a4444444-4444-4444-4444-444444444444', 'Health', 'health', 'Gift')
+on conflict (slug) do nothing;
+
+-- ── Supplier (Acme Supplies) ──
+insert into public.users (id, full_name, email, phone, role, is_verified)
+values ('b1111111-1111-1111-1111-111111111111', 'Acme Supplies', 'supplier@acme.com', '+233240000001', 'supplier', true)
+on conflict (id) do nothing;
+
+insert into public.wallets (user_id) values ('b1111111-1111-1111-1111-111111111111')
+on conflict (user_id) do nothing;
+
+insert into public.supplier_profiles (id, business_name, region, description, is_approved, rating)
+values ('b1111111-1111-1111-1111-111111111111', 'Acme Supplies', 'Greater Accra', 'Verified wholesale supplier based in Accra.', true, 4.5)
+on conflict (id) do nothing;
+
+-- ── Products ──
+insert into public.products (id, supplier_id, category_id, name, description, images, cost_price, suggested_price, stock_qty, sku, is_active) values
+  ('c1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111', 'Wireless Earbuds', 'High-quality wireless earbuds with charging case. Features Bluetooth 5.3 and 24h battery life.', ARRAY['https://via.placeholder.com/400x400?text=Earbuds'], 150.00, 250.00, 100, 'ACME-EARBUDS', true),
+  ('c2222222-2222-2222-2222-222222222222', 'b1111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111', 'Bluetooth Speaker', 'Portable waterproof Bluetooth speaker with 360° sound. IPX7 rating.', ARRAY['https://via.placeholder.com/400x400?text=Speaker'], 200.00, 350.00, 50, 'ACME-SPEAKER', true),
+  ('c3333333-3333-3333-3333-333333333333', 'b1111111-1111-1111-1111-111111111111', 'a2222222-2222-2222-2222-222222222222', 'Cotton T-Shirt', '100% cotton premium t-shirt. Available in multiple colors.', ARRAY['https://via.placeholder.com/400x400?text=T-Shirt'], 50.00, 100.00, 200, 'ACME-TSHIRT', true),
+  ('c4444444-4444-4444-4444-444444444444', 'b1111111-1111-1111-1111-111111111111', 'a4444444-4444-4444-4444-444444444444', 'Face Mask Pack', '5-layer reusable face masks with breathable filter pocket.', ARRAY['https://via.placeholder.com/400x400?text=Mask'], 30.00, 60.00, 300, 'ACME-MASK', true)
+on conflict (id) do nothing;
+
+-- ── Dropshipper (Amaka's Store) ──
+insert into public.users (id, full_name, email, phone, role, is_verified)
+values ('d1111111-1111-1111-1111-111111111111', 'Amaka Stores', 'amaka@store.com', '+233240000002', 'dropshipper', true)
+on conflict (id) do nothing;
+
+insert into public.wallets (user_id) values ('d1111111-1111-1111-1111-111111111111')
+on conflict (user_id) do nothing;
+
+insert into public.dropshipper_profiles (id, business_name, store_name, store_slug, description, logo_url, location, is_approved, commission_rate)
+values ('d1111111-1111-1111-1111-111111111111', 'Amaka Stores', 'Amaka''s Store', 'amakas-store', 'Your one-stop shop for quality electronics, fashion, and home essentials. Delivered nationwide via GhanaPost GPS.', 'https://via.placeholder.com/200x200?text=Amaka', 'Accra, Ghana', true, 0.10)
+on conflict (id) do nothing;
+
+-- ── Dropshipper products (published inventory) ──
+insert into public.dropshipper_products (dropshipper_id, product_id, custom_price, is_published) values
+  ('d1111111-1111-1111-1111-111111111111', 'c1111111-1111-1111-1111-111111111111', 350.00, true),
+  ('d1111111-1111-1111-1111-111111111111', 'c2222222-2222-2222-2222-222222222222', 450.00, true),
+  ('d1111111-1111-1111-1111-111111111111', 'c3333333-3333-3333-3333-333333333333', 120.00, true),
+  ('d1111111-1111-1111-1111-111111111111', 'c4444444-4444-4444-4444-444444444444', 80.00, true)
+on conflict (dropshipper_id, product_id) do nothing;

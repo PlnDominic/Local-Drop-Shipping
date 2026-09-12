@@ -1,5 +1,6 @@
 import type {
   DropshipperProduct,
+  DropshipperStoreProfile,
   Product,
   Transaction,
   UserProfile,
@@ -59,6 +60,26 @@ export interface WalletRow {
   balance: number;
   total_earned: number | null;
   currency: 'GHS';
+}
+
+export interface DropshipperProfileRow {
+  id: string;
+  business_name: string;
+  store_name: string | null;
+  store_slug: string | null;
+  description: string | null;
+  logo_url: string | null;
+  location: string | null;
+  commission_rate: number;
+  created_at: string;
+  // Storefront customization
+  theme_color: string;
+  banner_url: string | null;
+  tagline: string | null;
+  announcement: string | null;
+  whatsapp: string | null;
+  social_links: Record<string, string> | null;
+  featured_product_ids: string[] | null;
 }
 
 export interface WalletTransactionRow {
@@ -148,5 +169,27 @@ export function mapTransaction(row: WalletTransactionRow): Transaction {
     description: row.description,
     reference: row.reference ?? '',
     createdAt: row.created_at,
+  };
+}
+
+export function mapDropshipperProfile(row: DropshipperProfileRow): DropshipperStoreProfile {
+  return {
+    id: row.id,
+    businessName: row.business_name,
+    storeName: row.store_name ?? '',
+    storeSlug: row.store_slug ?? '',
+    description: row.description ?? '',
+    logoUrl: row.logo_url ?? undefined,
+    location: row.location ?? undefined,
+    commissionRate: Number(row.commission_rate ?? 0),
+    createdAt: row.created_at,
+    // Storefront customization
+    themeColor: row.theme_color ?? '#f04438',
+    bannerUrl: row.banner_url ?? undefined,
+    tagline: row.tagline ?? undefined,
+    announcement: row.announcement ?? undefined,
+    whatsapp: row.whatsapp ?? undefined,
+    socialLinks: (row.social_links as Record<string, string>) ?? {},
+    featuredProductIds: row.featured_product_ids ?? [],
   };
 }

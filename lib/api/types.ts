@@ -148,6 +148,33 @@ export interface UpdateDropshipperStorePayload {
   logoUrl?: string;
 }
 
+export interface SocialLinks {
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+  twitter?: string;
+}
+
+export interface DropshipperStoreProfile {
+  id: string;
+  businessName: string;
+  storeName: string;
+  storeSlug: string;
+  description: string;
+  logoUrl?: string;
+  location?: string;
+  commissionRate: number;
+  createdAt: string;
+  // Storefront customization
+  themeColor: string;
+  bannerUrl?: string;
+  tagline?: string;
+  announcement?: string;
+  whatsapp?: string;
+  socialLinks: SocialLinks;
+  featuredProductIds: string[];
+}
+
 // ── Orders ────────────────────────────────────────────────────────────────
 export type OrderStatus =
   | 'pending'

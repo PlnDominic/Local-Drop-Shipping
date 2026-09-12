@@ -33,6 +33,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.4
+    },
+    {
+      url: `${baseUrl}/store/example-store`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.6
     }
   ];
 }
