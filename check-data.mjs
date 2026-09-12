@@ -1,8 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    'Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY'
+  );
+}
+
 const supabase = createClient(
-  'https://kkmdrwsjsfjetapzobdf.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrbWRyd3Nqc2ZqZXRhcHpvYmRkZiIsImFjb3VzIjoiZ2VuZXJpYy1hcGktaW50ZXJuYWwtdjIiLCJpYXQiOjE3ODE5OTQ0NTAsImV4cCI6MjA5NzU3MDQ1MH0.W6iDq5kvnKxaytSOSvucGH3KgIQyvPH8XymNUVJKlE8'
+  supabaseUrl,
+  supabaseAnonKey
 );
 
 async function main() {
@@ -55,4 +64,7 @@ async function main() {
   }
 }
 
-main();
+main().catch((error) => {
+  console.error('Unexpected error:', error);
+  process.exit(1);
+});
