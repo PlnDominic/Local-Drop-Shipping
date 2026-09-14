@@ -177,7 +177,9 @@ export const DropshipperDashboard: React.FC = () => {
     showToast('Product imported to your store!', 'success');
   };
 
-  const handleWithdrawal = (e: React.FormEvent) => {
+  const [withdrawing, setWithdrawing] = useState(false);
+
+  const handleWithdrawal = async (e: React.FormEvent) => {
     e.preventDefault();
     setWithdrawError('');
     setWithdrawSuccess(false);
@@ -192,7 +194,9 @@ export const DropshipperDashboard: React.FC = () => {
       return;
     }
 
-    const success = withdrawFunds(uid, amt, `${momoProvider} (${momoPhone})`);
+    setWithdrawing(true);
+    const success = await withdrawFunds(uid, amt, `${momoProvider} (${momoPhone})`);
+    setWithdrawing(false);
     if (success) {
       setWithdrawSuccess(true);
       setWithdrawAmount('');
@@ -928,9 +932,10 @@ export const DropshipperDashboard: React.FC = () => {
 
                   <button
                     type="submit"
-                    className="w-full h-11 rounded bg-[#151515] text-[12px] font-black text-white hover:bg-[#f04438] transition-colors flex items-center justify-center gap-1.5"
+                    disabled={withdrawing}
+                    className="w-full h-11 rounded bg-[#151515] text-[12px] font-black text-white hover:bg-[#f04438] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
                   >
-                    <Wallet size={15} /> Withdraw Funds
+                    <Wallet size={15} /> {withdrawing ? 'Processing…' : 'Withdraw Funds'}
                   </button>
                 </form>
               </section>

@@ -424,3 +424,207 @@ $$;
 revoke all on function public.wallet_credit(uuid, numeric, text, text) from anon, authenticated;
 grant execute on function public.create_order(uuid, text, text, text, jsonb, text, numeric) to authenticated;
 grant execute on function public.wallet_withdraw(numeric, jsonb) to authenticated;
+
+-- ============================================================================
+-- Orders: structured delivery fields, order numbers, supplier visibility,
+-- and a status-transition function that credits the dropshipper's commission
+-- and each contributing supplier's payout once an order ships.
+-- ============================================================================
+
+alter table public.orders
+  add column if not exists customer_region text,
+  add column if not exists customer_city text,
+  add column if not exists customer_ghana_post_gps text,
+  add column if not exists order_number text unique;
+
+-- ── Suppliers can see orders/items containing their own products ───────────
+drop policy if exists "supplier reads orders with their products" on public.orders;
+create policy "supplier reads orders with their products" on public.orders for select
+  using (
+    exists (
+      select 1 from public.order_items oi
+      join public.products p on p.id = oi.product_id
+      where oi.order_id = orders.id and p.supplier_id = auth.uid()
+    )
+  );
+
+drop policy if exists "supplier reads own order items" on public.order_items;
+create policy "supplier reads own order items" on public.order_items for select
+  using (
+    exists (
+      select 1 from public.products p
+      where p.id = order_items.product_id and p.supplier_id = auth.uid()
+    )
+  );
+
+-- ── create_order: superseded signature adds structured delivery fields and
+--    a short human-readable order number. ──────────────────────────────────
+drop function if exists public.create_order(uuid, text, text, text, jsonb, text, numeric);
+
+create or replace function public.create_order(
+  p_dropshipper_id          uuid,
+  p_customer_name           text,
+  p_customer_phone          text,
+  p_customer_region         text,
+  p_customer_city           text,
+  p_customer_ghana_post_gps text,
+  p_items                   jsonb,
+  p_notes                   text default null,
+  p_platform_fee_percent    numeric default 2
+)
+returns public.orders
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_order      public.orders;
+  v_item       jsonb;
+  v_product_id uuid;
+  v_qty        int;
+  v_price      numeric;
+  v_subtotal   numeric := 0;
+  v_fee        numeric;
+begin
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+    raise exception 'Order must contain at least one item';
+  end if;
+
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    v_product_id := (v_item->>'productId')::uuid;
+    v_qty        := (v_item->>'quantity')::int;
+    if v_qty is null or v_qty < 1 then
+      raise exception 'Invalid quantity for product %', v_product_id;
+    end if;
+
+    select custom_price into v_price
+    from public.dropshipper_products
+    where dropshipper_id = p_dropshipper_id and product_id = v_product_id;
+
+    if v_price is null or v_price <= 0 then
+      raise exception 'Product % is not available in this store', v_product_id;
+    end if;
+
+    v_subtotal := v_subtotal + (v_price * v_qty);
+  end loop;
+
+  v_fee := round(v_subtotal * p_platform_fee_percent / 100, 2);
+
+  insert into public.orders (
+    dropshipper_id, customer_name, customer_phone,
+    customer_region, customer_city, customer_ghana_post_gps,
+    status, subtotal, platform_fee, total, notes, order_number
+  ) values (
+    p_dropshipper_id, p_customer_name, p_customer_phone,
+    p_customer_region, p_customer_city, p_customer_ghana_post_gps,
+    'pending', v_subtotal, v_fee, v_subtotal + v_fee, p_notes,
+    'LDK-' || lpad((floor(random() * 900000) + 100000)::text, 6, '0')
+  )
+  returning * into v_order;
+
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    v_product_id := (v_item->>'productId')::uuid;
+    v_qty        := (v_item->>'quantity')::int;
+    select custom_price into v_price
+    from public.dropshipper_products
+    where dropshipper_id = p_dropshipper_id and product_id = v_product_id;
+
+    insert into public.order_items (order_id, product_id, quantity, unit_price, subtotal)
+    values (v_order.id, v_product_id, v_qty, v_price, round(v_price * v_qty, 2));
+  end loop;
+
+  return v_order;
+end;
+$$;
+
+grant execute on function public.create_order(uuid, text, text, text, text, text, jsonb, text, numeric) to authenticated;
+
+-- ── update_order_status: the order's dropshipper, a supplier with items in
+--    it, or an admin can advance its status. Crediting the dropshipper's
+--    commission and each supplier's payout happens exactly once, on the
+--    first transition into 'shipped'. ───────────────────────────────────────
+create or replace function public.update_order_status(
+  p_order_id uuid,
+  p_status   text
+)
+returns public.orders
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid            uuid := auth.uid();
+  v_before         public.orders;
+  v_order          public.orders;
+  v_is_participant boolean;
+  v_commission     numeric;
+  v_payout_row     record;
+begin
+  if v_uid is null then
+    raise exception 'Not authenticated';
+  end if;
+  if p_status not in ('confirmed','processing','shipped','delivered','cancelled','refunded') then
+    raise exception 'Invalid status %', p_status;
+  end if;
+
+  select * into v_before from public.orders where id = p_order_id;
+  if v_before is null then
+    raise exception 'Order not found';
+  end if;
+
+  select
+    v_before.dropshipper_id = v_uid
+    or public.app_user_role() = 'admin'
+    or exists (
+      select 1 from public.order_items oi
+      join public.products p on p.id = oi.product_id
+      where oi.order_id = v_before.id and p.supplier_id = v_uid
+    )
+  into v_is_participant;
+
+  if not v_is_participant then
+    raise exception 'Not authorized to update this order';
+  end if;
+
+  update public.orders
+  set status = p_status, updated_at = now()
+  where id = p_order_id
+  returning * into v_order;
+
+  if p_status = 'shipped' and v_before.status is distinct from 'shipped' then
+    select coalesce(sum((oi.unit_price - p.cost_price) * oi.quantity), 0)
+    into v_commission
+    from public.order_items oi
+    join public.products p on p.id = oi.product_id
+    where oi.order_id = v_order.id;
+
+    if v_commission > 0 then
+      perform public.wallet_credit(
+        v_order.dropshipper_id, v_commission,
+        'Commission for order ' || coalesce(v_order.order_number, left(v_order.id::text, 8)),
+        'commission'
+      );
+    end if;
+
+    for v_payout_row in
+      select p.supplier_id as supplier_id, sum(p.cost_price * oi.quantity) as payout
+      from public.order_items oi
+      join public.products p on p.id = oi.product_id
+      where oi.order_id = v_order.id
+      group by p.supplier_id
+    loop
+      if v_payout_row.payout > 0 then
+        perform public.wallet_credit(
+          v_payout_row.supplier_id, v_payout_row.payout,
+          'Payout for order ' || coalesce(v_order.order_number, left(v_order.id::text, 8)),
+          'credit'
+        );
+      end if;
+    end loop;
+  end if;
+
+  return v_order;
+end;
+$$;
+
+grant execute on function public.update_order_status(uuid, text) to authenticated;

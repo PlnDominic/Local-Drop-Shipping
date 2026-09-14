@@ -99,6 +99,7 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number; // what the customer paid
   costPrice: number; // what the supplier charges
+  supplierId?: string; // which supplier fulfills this line (an order can span suppliers)
 }
 
 export interface Order {
@@ -230,8 +231,8 @@ interface AppState {
   addSupplierProductsBulk: (rows: Omit<Product, 'id' | 'supplierId' | 'supplierName' | 'createdAt' | 'reviews' | 'variants'>[]) => number;
   updateSupplierProductStock: (productId: string, newQty: number) => void;
   updateVariantStock: (productId: string, variantId: string, newQty: number) => void;
-  fulfillOrder: (orderId: string) => void;
-  shipOrder: (orderId: string) => void;
+  fulfillOrder: (orderId: string) => Promise<void>;
+  shipOrder: (orderId: string) => Promise<void>;
 
   // Review Actions
   addProductReview: (productId: string, review: { author: string; rating: number; comment: string }) => void;
@@ -241,9 +242,21 @@ interface AppState {
   togglePublishProduct: (dropshipperProductId: string) => void;
   updateImportedPrice: (dropshipperProductId: string, price: number) => void;
   removeImportedProduct: (dropshipperProductId: string) => void;
-  withdrawFunds: (userId: string, amount: number, details: string) => boolean;
+  withdrawFunds: (userId: string, amount: number, details: string) => Promise<boolean>;
 
   // Customer Actions
+  /** Places an order against a single dropshipper's store (e.g. from a storefront cart). */
+  submitOrder: (payload: {
+    dropshipperId: string;
+    items: Array<{ productId: string; quantity: number }>;
+    fullName: string;
+    phone: string;
+    region: string;
+    city: string;
+    ghanaPostGps: string;
+    notes?: string;
+  }) => Promise<{ success: boolean; orderNumber?: string; error?: string }>;
+  /** Places orders from the marketplace-wide cart, splitting by dropshipper as needed. */
   submitCheckout: (checkoutData: {
     fullName: string;
     phone: string;
@@ -253,7 +266,7 @@ interface AppState {
     paymentProvider: 'mtn_momo' | 'vodafone_cash' | 'airteltigo' | 'bank_card';
     momoNumber: string;
     notes?: string;
-  }) => { success: boolean; orderNumber?: string };
+  }) => Promise<{ success: boolean; orderNumber?: string; error?: string }>;
 
   // Admin Actions
   approveSupplier: (supplierProfileId: string) => void;
@@ -318,6 +331,81 @@ function mapSupplierProfileRow(row: SupplierProfileDbRow): SupplierProfile {
     description: row.description ?? '',
     isApproved: row.is_approved,
     rating: Number(row.rating ?? 0),
+  };
+}
+
+interface OrderItemDbRow {
+  id: string;
+  product_id: string | null;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+  products?: {
+    name: string;
+    cost_price: number;
+    supplier_id: string;
+    supplier_profiles?: { business_name: string } | null;
+  } | null;
+}
+
+interface OrderDbRow {
+  id: string;
+  order_number: string | null;
+  dropshipper_id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_region: string | null;
+  customer_city: string | null;
+  customer_ghana_post_gps: string | null;
+  status: Order['status'];
+  total: number;
+  notes: string | null;
+  created_at: string;
+  dropshipper_profiles?: { store_name: string | null } | null;
+  order_items?: OrderItemDbRow[];
+}
+
+function mapOrderRow(row: OrderDbRow): Order {
+  const items = row.order_items ?? [];
+  const first = items[0];
+  const profitAmount = items.reduce(
+    (sum, it) => sum + (Number(it.unit_price) - Number(it.products?.cost_price ?? 0)) * it.quantity,
+    0,
+  );
+  const costAmount = items.reduce((sum, it) => sum + Number(it.products?.cost_price ?? 0) * it.quantity, 0);
+
+  return {
+    id: row.id,
+    orderNumber: row.order_number ?? row.id.slice(0, 8).toUpperCase(),
+    customerId: '',
+    customerName: row.customer_name,
+    customerPhone: row.customer_phone,
+    dropshipperId: row.dropshipper_id,
+    dropshipperStoreName: row.dropshipper_profiles?.store_name ?? '',
+    supplierId: first?.products?.supplier_id ?? '',
+    supplierBusinessName: first?.products?.supplier_profiles?.business_name ?? '',
+    status: row.status,
+    totalAmount: Number(row.total),
+    profitAmount,
+    costAmount,
+    deliveryAddress: {
+      fullName: row.customer_name,
+      phone: row.customer_phone,
+      region: row.customer_region ?? '',
+      city: row.customer_city ?? '',
+      ghanaPostGps: row.customer_ghana_post_gps ?? '',
+    },
+    items: items.map((it) => ({
+      id: it.id,
+      productId: it.product_id ?? '',
+      productName: it.products?.name ?? 'Product',
+      quantity: it.quantity,
+      unitPrice: Number(it.unit_price),
+      costPrice: Number(it.products?.cost_price ?? 0),
+      supplierId: it.products?.supplier_id,
+    })),
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
   };
 }
 
@@ -440,9 +528,10 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       let wallets: Record<string, Wallet> = {};
       let transactions: Transaction[] = [];
       let dropshipperProfile: DropshipperProfile | null = null;
+      let orders: Order[] = [];
 
       if (uid) {
-        const [dpsRes, dpProfileRes, walletRes, txRes] = await Promise.all([
+        const [dpsRes, dpProfileRes, walletRes, txRes, ordersRes] = await Promise.all([
           supabase
             .from('dropshipper_products')
             .select('*, products(*, supplier_profiles(business_name))')
@@ -460,6 +549,13 @@ export const useGlobalStore = create<AppState>((set, get) => ({
             .eq('user_id', uid)
             .order('created_at', { ascending: false })
             .limit(50),
+          // RLS scopes this to: orders the caller placed as a dropshipper, orders
+          // containing a product the caller supplies, or (if admin) everything.
+          supabase
+            .from('orders')
+            .select('*, dropshipper_profiles(store_name), order_items(*, products(name, cost_price, supplier_id, supplier_profiles(business_name)))')
+            .order('created_at', { ascending: false })
+            .limit(200),
         ]);
 
         dropshipperProducts = (dpsRes.data ?? [])
@@ -511,6 +607,8 @@ export const useGlobalStore = create<AppState>((set, get) => ({
           reference: t.reference ?? '',
           createdAt: t.created_at,
         }));
+
+        orders = (ordersRes.data ?? []).map((o) => mapOrderRow(o as OrderDbRow));
       }
 
       if (dropshipperProducts.length === 0) {
@@ -526,6 +624,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         supplierProfile,
         wallets,
         transactions,
+        orders,
         hydrated: true,
       });
     } catch {
@@ -906,98 +1005,114 @@ export const useGlobalStore = create<AppState>((set, get) => ({
     }));
   },
 
-  withdrawFunds: (userId, amount, details) => {
+  withdrawFunds: async (userId, amount, details) => {
     const state = get();
     const wallet = state.wallets[userId];
     if (!wallet || wallet.balance < amount || amount <= 0) return false;
 
-    const updatedWallets = { ...state.wallets };
-    updatedWallets[userId] = { ...wallet, balance: wallet.balance - amount };
+    const { data: newBalance, error } = await supabase.rpc('wallet_withdraw', {
+      p_amount: amount,
+      p_account: { details },
+    });
 
-    const tx: Transaction = {
-      id: `local-tx-${Date.now()}`,
-      walletId: wallet.id,
-      amount,
-      type: 'withdrawal',
-      description: `Withdrawal to MoMo wallet (${details})`,
-      reference: `WDR-${Math.floor(100000 + Math.random() * 900000)}`,
-      createdAt: new Date().toISOString(),
-    };
+    if (error) {
+      console.error('Withdrawal failed:', error.message);
+      return false;
+    }
 
-    set({ wallets: updatedWallets, transactions: [tx, ...state.transactions] });
+    set((s) => ({
+      wallets: {
+        ...s.wallets,
+        [userId]: { ...s.wallets[userId], balance: Number(newBalance) },
+      },
+    }));
+    // Refresh the transaction history so the new withdrawal shows up.
+    void get().hydrate();
     return true;
   },
 
-  submitCheckout: (checkoutData) => {
-    const state = get();
-    if (state.cart.length === 0) return { success: false };
+  /** Places an order against a single dropshipper's store; used by storefront checkouts. */
+  submitOrder: async (payload) => {
+    const uid = get().currentUserId;
+    if (!uid) return { success: false, error: 'Please sign in to place an order.' };
+    if (payload.items.length === 0) return { success: false, error: 'Your cart is empty.' };
 
-    const orderNumber = `LDK-${Math.floor(100000 + Math.random() * 900000)}`;
-    const orderId = `local-o-${Date.now()}`;
-
-    let totalAmount = 0;
-    let profitAmount = 0;
-    let costAmount = 0;
-
-    const orderItems: OrderItem[] = state.cart.map((cartItem, idx) => {
-      const dpProd = state.dropshipperProducts.find((dp) => dp.id === cartItem.dropshipperProductId);
-      if (!dpProd) throw new Error('Product not found');
-      const itemTotal = dpProd.sellingPrice * cartItem.quantity;
-      const itemProfit = (dpProd.sellingPrice - dpProd.product.costPrice) * cartItem.quantity;
-      totalAmount += itemTotal;
-      profitAmount += itemProfit;
-      costAmount += dpProd.product.costPrice * cartItem.quantity;
-      return {
-        id: `oi-${idx}-${Date.now()}`,
-        productId: dpProd.productId,
-        productName: dpProd.product.name,
-        variantLabel: cartItem.variantLabel,
-        quantity: cartItem.quantity,
-        unitPrice: dpProd.sellingPrice,
-        costPrice: dpProd.product.costPrice,
-      };
+    const { data, error } = await supabase.rpc('create_order', {
+      p_dropshipper_id: payload.dropshipperId,
+      p_customer_name: payload.fullName,
+      p_customer_phone: payload.phone,
+      p_customer_region: payload.region,
+      p_customer_city: payload.city,
+      p_customer_ghana_post_gps: payload.ghanaPostGps,
+      p_items: payload.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+      p_notes: payload.notes || null,
     });
 
-    const firstDp = state.dropshipperProducts.find((dp) => dp.id === state.cart[0].dropshipperProductId);
+    if (error) return { success: false, error: error.message };
 
-    const newOrder: Order = {
-      id: orderId,
-      orderNumber,
-      customerId: state.currentUserId ?? 'guest',
-      customerName: checkoutData.fullName,
-      customerPhone: checkoutData.phone,
-      dropshipperId: firstDp?.dropshipperId ?? '',
-      dropshipperStoreName: '',
-      supplierId: firstDp?.product.supplierId ?? '',
-      supplierBusinessName: firstDp?.product.supplierName ?? '',
-      status: 'pending',
-      totalAmount,
-      profitAmount,
-      costAmount,
-      deliveryAddress: {
-        fullName: checkoutData.fullName,
-        phone: checkoutData.phone,
-        region: checkoutData.region,
-        city: checkoutData.city,
-        ghanaPostGps: checkoutData.ghanaPostGps,
-      },
-      items: orderItems,
-      notes: checkoutData.notes,
-      createdAt: new Date().toISOString(),
-    };
+    void get().hydrate();
+    return { success: true, orderNumber: (data as { order_number?: string } | null)?.order_number };
+  },
 
-    set((s) => ({ orders: [newOrder, ...s.orders], cart: [] }));
-    return { success: true, orderNumber };
+  submitCheckout: async (checkoutData) => {
+    const state = get();
+    if (state.cart.length === 0) return { success: false, error: 'Your cart is empty.' };
+    const uid = state.currentUserId;
+    if (!uid) return { success: false, error: 'Please sign in to place an order.' };
+
+    // The catalog-wide cart can span multiple dropshippers' stores; split into
+    // one create_order call per dropshipper since each order has one owner.
+    const byDropshipper = new Map<string, Array<{ productId: string; quantity: number }>>();
+    for (const cartItem of state.cart) {
+      const dp = state.dropshipperProducts.find((d) => d.id === cartItem.dropshipperProductId);
+      if (!dp) continue;
+      const items = byDropshipper.get(dp.dropshipperId) ?? [];
+      items.push({ productId: dp.productId, quantity: cartItem.quantity });
+      byDropshipper.set(dp.dropshipperId, items);
+    }
+
+    if (byDropshipper.size === 0) return { success: false, error: 'Your cart is empty.' };
+
+    let firstOrderNumber: string | undefined;
+    for (const [dropshipperId, items] of byDropshipper) {
+      const { data, error } = await supabase.rpc('create_order', {
+        p_dropshipper_id: dropshipperId,
+        p_customer_name: checkoutData.fullName,
+        p_customer_phone: checkoutData.phone,
+        p_customer_region: checkoutData.region,
+        p_customer_city: checkoutData.city,
+        p_customer_ghana_post_gps: checkoutData.ghanaPostGps,
+        p_items: items,
+        p_notes: checkoutData.notes || null,
+      });
+      if (error) return { success: false, error: error.message };
+      const orderNumber = (data as { order_number?: string } | null)?.order_number;
+      firstOrderNumber = firstOrderNumber ?? orderNumber;
+    }
+
+    set({ cart: [] });
+    void get().hydrate();
+    return { success: true, orderNumber: firstOrderNumber };
   },
 
   // Fulfill orders
-  fulfillOrder: (orderId) => set((state) => ({
-    orders: state.orders.map(o => o.id === orderId ? { ...o, status: 'processing' } : o)
-  })),
+  fulfillOrder: async (orderId) => {
+    const { error } = await supabase.rpc('update_order_status', { p_order_id: orderId, p_status: 'processing' });
+    if (error) { console.error('Failed to acknowledge order:', error.message); return; }
+    set((state) => ({
+      orders: state.orders.map((o) => (o.id === orderId ? { ...o, status: 'processing' } : o)),
+    }));
+  },
 
-  shipOrder: (orderId) => set((state) => ({
-    orders: state.orders.map(o => o.id === orderId ? { ...o, status: 'shipped' } : o)
-  })),
+  shipOrder: async (orderId) => {
+    const { error } = await supabase.rpc('update_order_status', { p_order_id: orderId, p_status: 'shipped' });
+    if (error) { console.error('Failed to ship order:', error.message); return; }
+    set((state) => ({
+      orders: state.orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped' } : o)),
+    }));
+    // Shipping triggers commission/payout crediting server-side — refresh wallets.
+    void get().hydrate();
+  },
 
   // Admin approves a supplier
   approveSupplier: (supplierProfileId) => {

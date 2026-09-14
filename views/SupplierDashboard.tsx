@@ -113,7 +113,9 @@ export const SupplierDashboard: React.FC = () => {
   const supplierProducts = products
     .filter((p) => p.supplierId === uid)
     .filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()));
-  const supplierOrders = orders.filter((o) => o.supplierId === uid);
+  // An order can span multiple suppliers; show it here whenever any of its
+  // items belong to this supplier (not just the order's "primary" supplier).
+  const supplierOrders = orders.filter((o) => o.items.some((item) => item.supplierId === uid));
   const wallet = wallets[uid] || { balance: 0, totalEarned: 0 };
   const pendingCount = supplierOrders.filter((o) => ['pending', 'processing'].includes(o.status)).length;
 
@@ -699,7 +701,11 @@ export const SupplierDashboard: React.FC = () => {
                 </div>
               </div>
             ) : (
-              supplierOrders.map((o) => (
+              supplierOrders.map((o) => {
+                // Only this supplier's own lines — an order can span several suppliers.
+                const myItems = o.items.filter((item) => item.supplierId === uid);
+                const myPayout = myItems.reduce((sum, item) => sum + item.costPrice * item.quantity, 0);
+                return (
                 <div key={o.id} className="bg-white rounded border border-gray-100 overflow-hidden">
                   <div className="border-b border-gray-100 px-4 py-3 flex flex-wrap items-center gap-2 text-[11px]">
                     <strong className="text-[#f04438] font-black text-[13px]">{o.orderNumber}</strong>
@@ -716,7 +722,7 @@ export const SupplierDashboard: React.FC = () => {
                   <div className="p-4 grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-4">
                     <div className="space-y-3">
                       <div className="rounded bg-[#f7f7f7] p-3 space-y-2">
-                        {o.items.map((item) => (
+                        {myItems.map((item) => (
                           <div key={item.id} className="flex justify-between text-[12px] font-semibold">
                             <span className="text-[#151515]">{item.productName} <strong className="text-[#f04438]">×{item.quantity}</strong></span>
                             <span className="text-[#999]">{formatMoney(item.costPrice)}</span>
@@ -724,7 +730,7 @@ export const SupplierDashboard: React.FC = () => {
                         ))}
                         <div className="flex justify-between text-[12px] font-black text-[#151515] border-t border-gray-200 pt-2">
                           <span>Payout pending</span>
-                          <span className="text-[#f04438]">{formatMoney(o.costAmount)}</span>
+                          <span className="text-[#f04438]">{formatMoney(myPayout)}</span>
                         </div>
                       </div>
 
@@ -761,7 +767,8 @@ export const SupplierDashboard: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         )}

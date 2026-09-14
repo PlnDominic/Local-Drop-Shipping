@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   ArrowRight,
@@ -31,6 +32,7 @@ import {
 import type { Category } from '../lib/supabase/types';
 import type { DropshipperProduct, DropshipperStoreProfile } from '../lib/api/types';
 import { useToast } from '../components/Toast';
+import { useGlobalStore } from '../store/globalStore';
 
 const formatMoney = (amount: number) =>
   `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
@@ -237,6 +239,9 @@ const ProductCard: React.FC<{
 
 export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSlug }) => {
   const { showToast } = useToast();
+  const router = useRouter();
+  const currentUserId = useGlobalStore((s) => s.currentUserId);
+  const submitOrder = useGlobalStore((s) => s.submitOrder);
 
   const [store, setStore] = useState<DropshipperStoreProfile | null>(null);
   const [products, setProducts] = useState<DropshipperProduct[]>([]);
@@ -254,6 +259,8 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [detailProduct, setDetailProduct] = useState<DropshipperProduct | null>(null);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
 
   const [cart, setCart] = useState<CartLine[]>([]);
 
@@ -401,18 +408,52 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
 
   const handleBuyNow = (dropshipperProductId: string) => {
     addToCart(dropshipperProductId);
+    if (!currentUserId) {
+      setCartOpen(true);
+      showToast('Please sign in to check out.', 'error');
+      router.push('/login');
+      return;
+    }
     setCartOpen(true);
     setCheckoutOpen(true);
   };
 
-  const handleCheckout = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleCheckout = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const orderNum = `LDK-${Math.floor(100000 + Math.random() * 900000)}`;
-    setOrderNumber(orderNum);
-    setCheckoutOpen(false);
-    setCartOpen(false);
-    clearCart();
-    showToast('Order placed successfully!', 'success');
+    if (!store) return;
+
+    if (!currentUserId) {
+      setCheckoutOpen(false);
+      showToast('Please sign in to place your order.', 'error');
+      router.push('/login');
+      return;
+    }
+
+    setCheckoutError('');
+    setCheckoutSubmitting(true);
+    const form = new FormData(event.currentTarget);
+    const result = await submitOrder({
+      dropshipperId: store.id,
+      items: cartLines.map((l) => ({ productId: l.item.productId, quantity: l.quantity })),
+      fullName: String(form.get('fullName') || ''),
+      phone: String(form.get('phone') || ''),
+      region: String(form.get('region') || ''),
+      city: String(form.get('city') || ''),
+      ghanaPostGps: String(form.get('ghanaPostGps') || ''),
+      notes: String(form.get('notes') || ''),
+    });
+    setCheckoutSubmitting(false);
+
+    if (result.success && result.orderNumber) {
+      setOrderNumber(result.orderNumber);
+      setCheckoutOpen(false);
+      setCartOpen(false);
+      clearCart();
+      showToast('Order placed successfully!', 'success');
+    } else {
+      setCheckoutError(result.error || 'Could not place your order. Please try again.');
+      showToast(result.error || 'Checkout failed', 'error');
+    }
   };
 
   // ── Featured products ──
@@ -1032,7 +1073,14 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
               <button
                 type="button"
                 disabled={cartLines.length === 0}
-                onClick={() => setCheckoutOpen(true)}
+                onClick={() => {
+                  if (!currentUserId) {
+                    showToast('Please sign in to check out.', 'error');
+                    router.push('/login');
+                    return;
+                  }
+                  setCheckoutOpen(true);
+                }}
                 style={{ backgroundColor: themeColor }}
                 className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg text-xs font-black text-white hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-300 transition-opacity"
               >
@@ -1067,6 +1115,12 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
                 <X size={18} />
               </button>
             </div>
+
+            {checkoutError && (
+              <div className="mb-4 rounded-lg bg-red-50 px-3 py-2.5 text-xs text-red-700 border border-red-100">
+                {checkoutError}
+              </div>
+            )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="grid gap-1 text-[11px] font-black text-[#666]">
@@ -1155,10 +1209,11 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
 
             <button
               type="submit"
+              disabled={checkoutSubmitting}
               style={{ backgroundColor: themeColor }}
-              className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg text-xs font-black text-white hover:opacity-90 transition-opacity"
+              className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg text-xs font-black text-white hover:opacity-90 transition-opacity disabled:opacity-60"
             >
-              Place Order & Pay with MoMo <CreditCard size={16} />
+              {checkoutSubmitting ? 'Placing order…' : 'Place Order & Pay with MoMo'} <CreditCard size={16} />
             </button>
           </form>
         </div>

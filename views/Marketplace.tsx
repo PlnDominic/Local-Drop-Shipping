@@ -25,6 +25,7 @@ import {
   Zap
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useGlobalStore } from '../store/globalStore';
 import type { DropshipperProduct, ProductReview } from '../store/globalStore';
 import { useToast } from '../components/Toast';
@@ -393,10 +394,12 @@ export const Marketplace: React.FC = () => {
     appliedPromo,
     applyPromoCode,
     clearPromo,
-    addProductReview
+    addProductReview,
+    currentUserId,
   } = useGlobalStore();
 
   const { showToast } = useToast();
+  const router = useRouter();
   const { profile } = useAuth();
 
   const [query, setQuery] = useState('');
@@ -411,6 +414,8 @@ export const Marketplace: React.FC = () => {
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
   const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [detailProduct, setDetailProduct] = useState<DropshipperProduct | null>(null);
@@ -544,19 +549,30 @@ export const Marketplace: React.FC = () => {
     }
   };
 
-  const handleCheckout = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleCheckout = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!currentUserId) {
+      setCheckoutOpen(false);
+      showToast('Please sign in to place your order.', 'error');
+      router.push('/login');
+      return;
+    }
+
+    setCheckoutError('');
+    setCheckoutSubmitting(true);
     const form = new FormData(event.currentTarget);
-    const result = submitCheckout({
-      fullName: String(form.get('fullName') || 'Ama Mensah'),
-      phone: String(form.get('phone') || '+233244123456'),
-      region: String(form.get('region') || 'Greater Accra'),
-      city: String(form.get('city') || 'Accra'),
-      ghanaPostGps: String(form.get('ghanaPostGps') || 'GA-184-9022'),
+    const result = await submitCheckout({
+      fullName: String(form.get('fullName') || ''),
+      phone: String(form.get('phone') || ''),
+      region: String(form.get('region') || ''),
+      city: String(form.get('city') || ''),
+      ghanaPostGps: String(form.get('ghanaPostGps') || ''),
       paymentProvider: 'mtn_momo',
-      momoNumber: String(form.get('momoNumber') || '+233244123456'),
+      momoNumber: String(form.get('momoNumber') || ''),
       notes: String(form.get('notes') || '')
     });
+    setCheckoutSubmitting(false);
+
     if (result.success && result.orderNumber) {
       setOrderNumber(result.orderNumber);
       setCheckoutOpen(false);
@@ -564,6 +580,9 @@ export const Marketplace: React.FC = () => {
       clearPromo();
       setPromoInput('');
       showToast('Order placed successfully!', 'success');
+    } else {
+      setCheckoutError(result.error || 'Could not place your order. Please try again.');
+      showToast(result.error || 'Checkout failed', 'error');
     }
   };
 
@@ -1237,7 +1256,14 @@ export const Marketplace: React.FC = () => {
               <button
                 type="button"
                 disabled={cartLines.length === 0}
-                onClick={() => setCheckoutOpen(true)}
+                onClick={() => {
+                  if (!currentUserId) {
+                    showToast('Please sign in to check out.', 'error');
+                    router.push('/login');
+                    return;
+                  }
+                  setCheckoutOpen(true);
+                }}
                 className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded bg-[#f04438] text-sm font-black text-white hover:bg-[#c0392b] disabled:cursor-not-allowed disabled:bg-gray-300 transition-colors"
               >
                 Checkout <ArrowRight size={17} />
@@ -1254,12 +1280,18 @@ export const Marketplace: React.FC = () => {
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-black">Checkout</h2>
-                <p className="text-xs text-[#777]">Demo checkout — creates a local order.</p>
+                <p className="text-xs text-[#777]">Your order goes straight to the store's dashboard.</p>
               </div>
               <button type="button" onClick={() => setCheckoutOpen(false)} className="grid h-9 w-9 place-items-center rounded border border-gray-200 hover:bg-gray-50">
                 <X size={18} />
               </button>
             </div>
+
+            {checkoutError && (
+              <div className="mb-4 rounded bg-red-50 px-3 py-2.5 text-xs text-red-700 border border-red-100">
+                {checkoutError}
+              </div>
+            )}
 
             <div className="mb-4">
               <label className="block text-xs font-black text-[#777] mb-1">Promo Code</label>
@@ -1333,8 +1365,12 @@ export const Marketplace: React.FC = () => {
               <p className="mt-1 text-xs text-[#777]">Payment: MTN MoMo (demo)</p>
             </div>
 
-            <button type="submit" className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded bg-[#f04438] text-sm font-black text-white hover:bg-[#c0392b] transition-colors">
-              Place Order <CreditCard size={17} />
+            <button
+              type="submit"
+              disabled={checkoutSubmitting}
+              className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded bg-[#f04438] text-sm font-black text-white hover:bg-[#c0392b] transition-colors disabled:opacity-60"
+            >
+              {checkoutSubmitting ? 'Placing order…' : 'Place Order'} <CreditCard size={17} />
             </button>
           </form>
         </div>
