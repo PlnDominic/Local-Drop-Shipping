@@ -654,3 +654,23 @@ create policy "owner updates own storefront assets" on storage.objects for updat
 drop policy if exists "owner deletes own storefront assets" on storage.objects;
 create policy "owner deletes own storefront assets" on storage.objects for delete
   using (bucket_id = 'storefront-assets' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ============================================================================
+-- Admin oversight: the existing owner-only policies never granted the admin
+-- role any access to supplier approvals or platform-wide financials. Without
+-- these, the admin dashboard's Approve button, wallet totals, and commission
+-- feed all fail silently under RLS no matter what the app code does.
+-- ============================================================================
+
+drop policy if exists "admin manages supplier profiles" on public.supplier_profiles;
+create policy "admin manages supplier profiles" on public.supplier_profiles for all
+  using (public.app_user_role() = 'admin')
+  with check (public.app_user_role() = 'admin');
+
+drop policy if exists "admin reads all wallets" on public.wallets;
+create policy "admin reads all wallets" on public.wallets for select
+  using (public.app_user_role() = 'admin');
+
+drop policy if exists "admin reads all wallet transactions" on public.wallet_transactions;
+create policy "admin reads all wallet transactions" on public.wallet_transactions for select
+  using (public.app_user_role() = 'admin');

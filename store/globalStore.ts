@@ -11,6 +11,7 @@ export interface User {
   role: 'admin' | 'supplier' | 'dropshipper' | 'customer';
   avatarUrl: string;
   isVerified: boolean;
+  createdAt: string;
 }
 
 export interface SupplierProfile {
@@ -22,11 +23,13 @@ export interface SupplierProfile {
   description: string;
   isApproved: boolean;
   rating: number;
+  createdAt: string;
 }
 
 export interface DropshipperProfile {
   id: string;
   userId: string;
+  businessName: string;
   storeName: string;
   storeSlug: string;
   commissionRate: number;
@@ -38,6 +41,7 @@ export interface DropshipperProfile {
   whatsapp: string;
   socialLinks: Record<string, string>;
   featuredProductIds: string[];
+  createdAt: string;
 }
 
 export interface Category {
@@ -114,6 +118,7 @@ export interface Order {
   supplierBusinessName: string;
   status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   totalAmount: number;
+  platformFee: number; // the platform's cut, already included in totalAmount
   profitAmount: number; // (sellingPrice - costPrice) * quantity
   costAmount: number; // costPrice * quantity
   deliveryAddress: {
@@ -142,16 +147,6 @@ export interface Transaction {
   type: 'credit' | 'debit' | 'withdrawal' | 'refund';
   description: string;
   reference: string;
-  createdAt: string;
-}
-
-export interface Commission {
-  id: string;
-  orderId: string;
-  orderNumber: string;
-  dropshipperId: string;
-  amount: number;
-  status: 'pending' | 'paid';
   createdAt: string;
 }
 
@@ -202,7 +197,6 @@ interface AppState {
   orders: Order[];
   wallets: Record<string, Wallet>; // key: userId
   transactions: Transaction[];
-  commissions: Commission[];
   notifications: NotificationLog[];
 
   // Cart State (Customer side)
@@ -269,8 +263,8 @@ interface AppState {
   }) => Promise<{ success: boolean; orderNumber?: string; error?: string }>;
 
   // Admin Actions
+  setSupplierApproval: (supplierProfileId: string, approved: boolean) => void;
   approveSupplier: (supplierProfileId: string) => void;
-  releaseCommission: (commissionId: string) => void;
 }
 
 // ── DB row → store type mappers (snake_case → camelCase) ─────────────────────
@@ -319,6 +313,7 @@ interface SupplierProfileDbRow {
   description: string | null;
   is_approved: boolean;
   rating: number | null;
+  created_at: string;
 }
 
 function mapSupplierProfileRow(row: SupplierProfileDbRow): SupplierProfile {
@@ -331,6 +326,66 @@ function mapSupplierProfileRow(row: SupplierProfileDbRow): SupplierProfile {
     description: row.description ?? '',
     isApproved: row.is_approved,
     rating: Number(row.rating ?? 0),
+    createdAt: row.created_at,
+  };
+}
+
+interface DropshipperProfileDbRow {
+  id: string;
+  business_name: string;
+  store_name: string | null;
+  store_slug: string | null;
+  commission_rate: number | null;
+  theme_color: string | null;
+  banner_url: string | null;
+  tagline: string | null;
+  announcement: string | null;
+  whatsapp: string | null;
+  social_links: Record<string, string> | null;
+  featured_product_ids: string[] | null;
+  created_at: string;
+}
+
+function mapDropshipperProfileRow(dp: DropshipperProfileDbRow): DropshipperProfile {
+  return {
+    id: dp.id,
+    userId: dp.id,
+    businessName: dp.business_name ?? '',
+    storeName: dp.store_name ?? '',
+    storeSlug: dp.store_slug ?? '',
+    commissionRate: Number(dp.commission_rate ?? 0),
+    themeColor: dp.theme_color ?? '#f04438',
+    bannerUrl: dp.banner_url ?? '',
+    tagline: dp.tagline ?? '',
+    announcement: dp.announcement ?? '',
+    whatsapp: dp.whatsapp ?? '',
+    socialLinks: dp.social_links ?? {},
+    featuredProductIds: dp.featured_product_ids ?? [],
+    createdAt: dp.created_at,
+  };
+}
+
+interface UserDbRow {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  role: User['role'];
+  avatar_url: string | null;
+  is_verified: boolean;
+  created_at: string;
+}
+
+function mapUserRow(row: UserDbRow): User {
+  return {
+    id: row.id,
+    email: row.email,
+    phone: row.phone,
+    fullName: row.full_name,
+    role: row.role,
+    avatarUrl: row.avatar_url ?? '',
+    isVerified: row.is_verified,
+    createdAt: row.created_at,
   };
 }
 
@@ -359,6 +414,7 @@ interface OrderDbRow {
   customer_ghana_post_gps: string | null;
   status: Order['status'];
   total: number;
+  platform_fee: number;
   notes: string | null;
   created_at: string;
   dropshipper_profiles?: { store_name: string | null } | null;
@@ -386,6 +442,7 @@ function mapOrderRow(row: OrderDbRow): Order {
     supplierBusinessName: first?.products?.supplier_profiles?.business_name ?? '',
     status: row.status,
     totalAmount: Number(row.total),
+    platformFee: Number(row.platform_fee ?? 0),
     profitAmount,
     costAmount,
     deliveryAddress: {
@@ -492,7 +549,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   hydrate: async () => {
     const uid = get().currentUserId;
     try {
-      const [catsRes, prodsRes, supplierProfilesRes] = await Promise.all([
+      const [catsRes, prodsRes, supplierProfilesRes, dropshipperProfilesRes] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
         supabase
           .from('products')
@@ -502,6 +559,8 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         // Public (RLS-readable by anyone) so the admin approvals queue and each
         // supplier's own status can both be derived from one fetch.
         supabase.from('supplier_profiles').select('*').order('created_at', { ascending: false }),
+        // Also public — powers an admin directory of every storefront.
+        supabase.from('dropshipper_profiles').select('*').order('created_at', { ascending: false }),
       ]);
 
       const categories: Category[] = (catsRes.data ?? []).map((c) => ({
@@ -524,24 +583,24 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       );
       const supplierProfile = uid ? supplierProfiles.find((sp) => sp.id === uid) ?? null : null;
 
+      const dropshipperProfiles: DropshipperProfile[] = (dropshipperProfilesRes.data ?? []).map((dp) =>
+        mapDropshipperProfileRow(dp as DropshipperProfileDbRow),
+      );
+      const dropshipperProfile = uid ? dropshipperProfiles.find((dp) => dp.id === uid) ?? null : null;
+
       let dropshipperProducts: DropshipperProduct[] = [];
       let wallets: Record<string, Wallet> = {};
       let transactions: Transaction[] = [];
-      let dropshipperProfile: DropshipperProfile | null = null;
       let orders: Order[] = [];
+      let users: User[] = [];
 
       if (uid) {
-        const [dpsRes, dpProfileRes, walletRes, txRes, ordersRes] = await Promise.all([
+        const [dpsRes, walletRes, txRes, ordersRes, usersRes] = await Promise.all([
           supabase
             .from('dropshipper_products')
             .select('*, products(*, supplier_profiles(business_name))')
             .eq('dropshipper_id', uid)
             .order('created_at', { ascending: false }),
-          supabase
-            .from('dropshipper_profiles')
-            .select('*')
-            .eq('id', uid)
-            .maybeSingle(),
           supabase.from('wallets').select('*').eq('user_id', uid).maybeSingle(),
           supabase
             .from('wallet_transactions')
@@ -556,6 +615,9 @@ export const useGlobalStore = create<AppState>((set, get) => ({
             .select('*, dropshipper_profiles(store_name), order_items(*, products(name, cost_price, supplier_id, supplier_profiles(business_name)))')
             .order('created_at', { ascending: false })
             .limit(200),
+          // RLS ("users read own profile") only actually returns rows beyond the
+          // caller's own for an admin — harmless empty result for everyone else.
+          supabase.from('users').select('*').order('created_at', { ascending: false }).limit(500),
         ]);
 
         dropshipperProducts = (dpsRes.data ?? [])
@@ -569,24 +631,6 @@ export const useGlobalStore = create<AppState>((set, get) => ({
             customDescription: d.custom_description ?? (d.products as ProductDbRow).description,
             isPublished: d.is_published,
           }));
-
-        const dp = dpProfileRes.data;
-        if (dp) {
-          dropshipperProfile = {
-            id: dp.id,
-            userId: dp.id,
-            storeName: dp.store_name ?? '',
-            storeSlug: dp.store_slug ?? '',
-            commissionRate: Number(dp.commission_rate ?? 0),
-            themeColor: dp.theme_color ?? '#f04438',
-            bannerUrl: dp.banner_url ?? '',
-            tagline: dp.tagline ?? '',
-            announcement: dp.announcement ?? '',
-            whatsapp: dp.whatsapp ?? '',
-            socialLinks: dp.social_links ?? {},
-            featuredProductIds: dp.featured_product_ids ?? [],
-          };
-        }
 
         const w = walletRes.data;
         wallets = {
@@ -609,6 +653,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         }));
 
         orders = (ordersRes.data ?? []).map((o) => mapOrderRow(o as OrderDbRow));
+        users = (usersRes.data ?? []).map((u) => mapUserRow(u as UserDbRow));
       }
 
       if (dropshipperProducts.length === 0) {
@@ -620,11 +665,13 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         products,
         dropshipperProducts,
         dropshipperProfile,
+        dropshipperProfiles,
         supplierProfiles,
         supplierProfile,
         wallets,
         transactions,
         orders,
+        users,
         hydrated: true,
       });
     } catch {
@@ -656,7 +703,6 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   orders: [],
   wallets: {},
   transactions: [],
-  commissions: [],
   notifications: [],
   cart: [],
 
@@ -1114,43 +1160,40 @@ export const useGlobalStore = create<AppState>((set, get) => ({
     void get().hydrate();
   },
 
-  // Admin approves a supplier
-  approveSupplier: (supplierProfileId) => {
+  // Admin approves or revokes a supplier's ability to sell
+  setSupplierApproval: (supplierProfileId, approved) => {
     const state = get();
+    const previous = state.supplierProfiles.find((p) => p.id === supplierProfileId)?.isApproved;
+
     set({
       supplierProfiles: state.supplierProfiles.map((p) =>
-        p.id === supplierProfileId ? { ...p, isApproved: true } : p
+        p.id === supplierProfileId ? { ...p, isApproved: approved } : p
       ),
       supplierProfile:
         state.supplierProfile?.id === supplierProfileId
-          ? { ...state.supplierProfile, isApproved: true }
+          ? { ...state.supplierProfile, isApproved: approved }
           : state.supplierProfile,
     });
 
     supabase
       .from('supplier_profiles')
-      .update({ is_approved: true, updated_at: new Date().toISOString() })
+      .update({ is_approved: approved, updated_at: new Date().toISOString() })
       .eq('id', supplierProfileId)
       .then(({ error }) => {
-        if (error) {
+        if (error && previous !== undefined) {
           set((s) => ({
             supplierProfiles: s.supplierProfiles.map((p) =>
-              p.id === supplierProfileId ? { ...p, isApproved: false } : p
+              p.id === supplierProfileId ? { ...p, isApproved: previous } : p
             ),
             supplierProfile:
               s.supplierProfile?.id === supplierProfileId
-                ? { ...s.supplierProfile, isApproved: false }
+                ? { ...s.supplierProfile, isApproved: previous }
                 : s.supplierProfile,
           }));
-          console.error('Failed to approve supplier:', error.message);
+          console.error('Failed to update supplier approval:', error.message);
         }
       });
   },
 
-  // Admin releases commission
-  releaseCommission: (commissionId) => set((state) => ({
-    commissions: state.commissions.map(c =>
-      c.id === commissionId ? { ...c, status: 'paid' } : c
-    )
-  }))
+  approveSupplier: (supplierProfileId) => get().setSupplierApproval(supplierProfileId, true),
 }));
