@@ -207,6 +207,7 @@ export const DropshipperDashboard: React.FC = () => {
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
     { id: 'import', label: 'Import Products', icon: PlusCircle },
     { id: 'my-store', label: 'My Store', icon: ShoppingBag },
+    { id: 'customize', label: 'Customize Store', icon: Palette },
     { id: 'orders', label: 'Orders', icon: FileText },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
   ];
@@ -302,7 +303,14 @@ export const DropshipperDashboard: React.FC = () => {
                     >
                       Import Products <ArrowRight size={14} />
                     </button>
-                    {storefrontUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('customize')}
+                      className="h-9 rounded border border-gray-200 px-5 text-[11px] font-black text-[#151515] hover:border-[#f04438] hover:text-[#f04438] transition-colors flex items-center gap-1.5"
+                    >
+                      <Palette size={13} /> Customize Store
+                    </button>
+                    {storefrontUrl && (
                       <a
                         href={storefrontUrl}
                         target="_blank"
@@ -311,14 +319,6 @@ export const DropshipperDashboard: React.FC = () => {
                       >
                         <Share2 size={13} /> View Storefront
                       </a>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => { setActiveTab('import'); }}
-                        className="h-9 rounded border border-gray-200 px-5 text-[11px] font-black text-[#151515] hover:border-[#f04438] hover:text-[#f04438] transition-colors flex items-center gap-1.5"
-                      >
-                        <PlusCircle size={13} /> Publish Products
-                      </button>
                     )}
                   </div>
                 </div>
@@ -492,7 +492,7 @@ export const DropshipperDashboard: React.FC = () => {
         {/* ── CUSTOMIZE STORE ── */}
         {activeTab === 'customize' && (
           <form onSubmit={handleSaveCustomization} className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-lg border border-gray-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded border border-gray-100">
               <div>
                 <h2 className="text-lg font-black text-[#151515]">Storefront Customizer</h2>
                 <p className="text-xs text-[#777]">
@@ -505,7 +505,7 @@ export const DropshipperDashboard: React.FC = () => {
                     href={storefrontUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="h-10 px-4 rounded-lg border border-gray-200 text-xs font-black text-[#151515] hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5"
+                    className="h-10 px-4 rounded border border-gray-200 text-xs font-black text-[#151515] hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5"
                   >
                     <ExternalLink size={14} /> View Live Store
                   </a>
@@ -513,7 +513,7 @@ export const DropshipperDashboard: React.FC = () => {
                 <button
                   type="submit"
                   disabled={savingCustomization}
-                  className="h-10 px-6 rounded-lg bg-[#151515] hover:bg-[#f04438] text-xs font-black text-white transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+                  className="h-10 px-6 rounded bg-[#151515] hover:bg-[#f04438] text-xs font-black text-white transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
                 >
                   <Sparkles size={14} />
                   {savingCustomization ? 'Saving...' : 'Save Changes'}
@@ -525,7 +525,7 @@ export const DropshipperDashboard: React.FC = () => {
               {/* Left Column: Branding & Color */}
               <div className="space-y-5">
                 {/* Brand Color */}
-                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                <div className="bg-white rounded border border-gray-100 p-5 space-y-4">
                   <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
                     <Palette size={16} style={{ color: themeColor }} /> Brand Color Scheme
                   </div>
@@ -582,7 +582,7 @@ export const DropshipperDashboard: React.FC = () => {
                 </div>
 
                 {/* Announcement Bar */}
-                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                <div className="bg-white rounded border border-gray-100 p-5 space-y-4">
                   <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
                     <Sliders size={16} /> Top Promo Strip
                   </div>
@@ -604,7 +604,7 @@ export const DropshipperDashboard: React.FC = () => {
                 </div>
 
                 {/* Tagline & Identity */}
-                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                <div className="bg-white rounded border border-gray-100 p-5 space-y-4">
                   <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
                     <Sparkles size={16} /> Identity & Tagline
                   </div>
@@ -626,7 +626,7 @@ export const DropshipperDashboard: React.FC = () => {
               {/* Middle Column: Visual Assets & Social */}
               <div className="space-y-5">
                 {/* Hero Banner */}
-                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                <div className="bg-white rounded border border-gray-100 p-5 space-y-4">
                   <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
                     <ImageIcon size={16} /> Hero Banner Image
                   </div>
@@ -646,7 +646,7 @@ export const DropshipperDashboard: React.FC = () => {
                     />
                   </div>
                   {bannerUrl && (
-                    <div className="h-28 rounded-lg overflow-hidden border border-gray-200 relative">
+                    <div className="h-28 rounded overflow-hidden border border-gray-200 relative">
                       <img src={bannerUrl} alt="Banner Preview" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white text-[11px] font-black">
                         Preview
@@ -656,7 +656,7 @@ export const DropshipperDashboard: React.FC = () => {
                 </div>
 
                 {/* WhatsApp & Contacts */}
-                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                <div className="bg-white rounded border border-gray-100 p-5 space-y-4">
                   <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
                     <MessageCircle size={16} className="text-emerald-500" /> WhatsApp Direct Chat
                   </div>
@@ -678,7 +678,7 @@ export const DropshipperDashboard: React.FC = () => {
                 </div>
 
                 {/* Social Links */}
-                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                <div className="bg-white rounded border border-gray-100 p-5 space-y-4">
                   <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
                     <Globe size={16} /> Social Media Links
                   </div>
@@ -729,7 +729,7 @@ export const DropshipperDashboard: React.FC = () => {
 
               {/* Right Column: Featured Products Selector */}
               <div className="space-y-5">
-                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                <div className="bg-white rounded border border-gray-100 p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
                       <Sparkles size={16} style={{ color: themeColor }} /> Featured Picks ({selectedFeatured.length}/4)
@@ -740,7 +740,7 @@ export const DropshipperDashboard: React.FC = () => {
                   </p>
 
                   {dropshipperProducts.length === 0 ? (
-                    <div className="p-6 text-center border border-dashed border-gray-200 rounded-lg">
+                    <div className="p-6 text-center border border-dashed border-gray-200 rounded">
                       <p className="text-xs text-[#777]">You have no imported products yet. Import products to feature them here.</p>
                     </div>
                   ) : (
@@ -751,7 +751,7 @@ export const DropshipperDashboard: React.FC = () => {
                           <div
                             key={dp.id}
                             onClick={() => toggleFeaturedProduct(dp.id)}
-                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                            className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-all ${
                               isPinned
                                 ? 'border-[#151515] bg-[#151515]/5 shadow-xs'
                                 : 'border-gray-100 bg-[#fafafa] hover:border-gray-300'
@@ -786,7 +786,7 @@ export const DropshipperDashboard: React.FC = () => {
               <button
                 type="submit"
                 disabled={savingCustomization}
-                className="h-11 px-8 rounded-lg bg-[#151515] hover:bg-[#f04438] text-xs font-black text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="h-11 px-8 rounded bg-[#151515] hover:bg-[#f04438] text-xs font-black text-white transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 <Sparkles size={15} />
                 {savingCustomization ? 'Saving Changes...' : 'Save Storefront Customization'}
