@@ -83,11 +83,12 @@ export const SupplierDashboard: React.FC = () => {
     categories,
     wallets,
     currentUserId,
+    supplierProfile,
   } = useGlobalStore();
 
   const { profile } = useAuth();
   const uid = currentUserId ?? '';
-  const businessName = profile?.fullName || 'My Wholesale Store';
+  const businessName = supplierProfile?.businessName || profile?.fullName || 'My Wholesale Store';
 
   const [activeTab, setActiveTab] = useState<Tab>('products');
   const [query, setQuery] = useState('');
@@ -271,9 +272,18 @@ export const SupplierDashboard: React.FC = () => {
       <div className="bg-[#151515] text-white">
         <div className="max-w-[1280px] mx-auto px-4 py-7 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-[#f04438] text-[11px] font-black uppercase tracking-widest mb-1">Supplier Portal</p>
+            <p className="text-[#f04438] text-[11px] font-black uppercase tracking-widest mb-1 flex items-center gap-2">
+              Supplier Portal
+              {supplierProfile?.isApproved && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] text-emerald-400">
+                  <CheckCircle2 size={10} /> Verified
+                </span>
+              )}
+            </p>
             <h1 className="text-[26px] font-black leading-tight">{businessName}</h1>
-            <p className="text-gray-400 text-[12px] mt-1">List wholesale items and fulfill dropshipper orders.</p>
+            <p className="text-gray-400 text-[12px] mt-1">
+              {supplierProfile?.region ? `${supplierProfile.region} · ` : ''}List wholesale items and fulfill dropshipper orders.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded bg-white/5 border border-white/10 px-4 py-3">

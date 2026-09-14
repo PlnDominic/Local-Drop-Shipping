@@ -19,6 +19,7 @@ export interface SupplierProfile {
   businessName: string;
   businessRegNumber: string;
   region: string;
+  description: string;
   isApproved: boolean;
   rating: number;
 }
@@ -176,6 +177,10 @@ interface AppState {
   dropshipperProfile: DropshipperProfile | null;
   setDropshipperProfile: (profile: DropshipperProfile | null) => void;
 
+  // Supplier profile for the current user (null when not a supplier, or pending setup)
+  supplierProfile: SupplierProfile | null;
+  setSupplierProfile: (profile: SupplierProfile | null) => void;
+
   // Data hydration from Supabase
   hydrated: boolean;
   hydrate: () => Promise<void>;
@@ -214,6 +219,13 @@ interface AppState {
   clearCart: () => void;
 
   // Supplier Actions
+  /** Create or update the current user's supplier profile (application for approval). */
+  submitSupplierProfile: (payload: {
+    businessName: string;
+    businessRegNumber: string;
+    region: string;
+    description: string;
+  }) => Promise<{ error: string | null }>;
   addSupplierProduct: (productData: Omit<Product, 'id' | 'supplierId' | 'supplierName' | 'createdAt'>) => void;
   addSupplierProductsBulk: (rows: Omit<Product, 'id' | 'supplierId' | 'supplierName' | 'createdAt' | 'reviews' | 'variants'>[]) => number;
   updateSupplierProductStock: (productId: string, newQty: number) => void;
@@ -283,6 +295,29 @@ function mapProductRow(p: ProductDbRow): Product {
     createdAt: p.created_at,
     reviews: [],
     variants: [],
+  };
+}
+
+interface SupplierProfileDbRow {
+  id: string;
+  business_name: string;
+  business_reg_number: string | null;
+  region: string | null;
+  description: string | null;
+  is_approved: boolean;
+  rating: number | null;
+}
+
+function mapSupplierProfileRow(row: SupplierProfileDbRow): SupplierProfile {
+  return {
+    id: row.id,
+    userId: row.id,
+    businessName: row.business_name,
+    businessRegNumber: row.business_reg_number ?? '',
+    region: row.region ?? '',
+    description: row.description ?? '',
+    isApproved: row.is_approved,
+    rating: Number(row.rating ?? 0),
   };
 }
 
@@ -362,17 +397,23 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   dropshipperProfile: null,
   setDropshipperProfile: (profile) => set({ dropshipperProfile: profile }),
 
+  supplierProfile: null,
+  setSupplierProfile: (profile) => set({ supplierProfile: profile }),
+
   hydrated: false,
   hydrate: async () => {
     const uid = get().currentUserId;
     try {
-      const [catsRes, prodsRes] = await Promise.all([
+      const [catsRes, prodsRes, supplierProfilesRes] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
         supabase
           .from('products')
           .select('*, supplier_profiles(business_name)')
           .eq('is_active', true)
           .order('created_at', { ascending: false }),
+        // Public (RLS-readable by anyone) so the admin approvals queue and each
+        // supplier's own status can both be derived from one fetch.
+        supabase.from('supplier_profiles').select('*').order('created_at', { ascending: false }),
       ]);
 
       const categories: Category[] = (catsRes.data ?? []).map((c) => ({
@@ -389,6 +430,11 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       if (products.length === 0) {
         products.push(...SEED_PRODUCTS);
       }
+
+      const supplierProfiles: SupplierProfile[] = (supplierProfilesRes.data ?? []).map((sp) =>
+        mapSupplierProfileRow(sp as SupplierProfileDbRow),
+      );
+      const supplierProfile = uid ? supplierProfiles.find((sp) => sp.id === uid) ?? null : null;
 
       let dropshipperProducts: DropshipperProduct[] = [];
       let wallets: Record<string, Wallet> = {};
@@ -471,7 +517,17 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         dropshipperProducts = SEED_DROPSHIPPER_PRODUCTS;
       }
 
-      set({ categories, products, dropshipperProducts, dropshipperProfile, wallets, transactions, hydrated: true });
+      set({
+        categories,
+        products,
+        dropshipperProducts,
+        dropshipperProfile,
+        supplierProfiles,
+        supplierProfile,
+        wallets,
+        transactions,
+        hydrated: true,
+      });
     } catch {
       // Surface an empty (not fake) state if Supabase is unreachable.
       set({ hydrated: true });
@@ -542,6 +598,37 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   })),
 
   clearCart: () => set({ cart: [] }),
+
+  submitSupplierProfile: async (payload) => {
+    const uid = get().currentUserId;
+    if (!uid) return { error: 'You must be signed in.' };
+
+    const { data, error } = await supabase
+      .from('supplier_profiles')
+      .upsert(
+        {
+          id: uid,
+          business_name: payload.businessName,
+          business_reg_number: payload.businessRegNumber,
+          region: payload.region,
+          description: payload.description,
+        },
+        { onConflict: 'id' },
+      )
+      .select('*')
+      .single();
+
+    if (error) return { error: error.message };
+
+    set({ supplierProfile: mapSupplierProfileRow(data as SupplierProfileDbRow) });
+    set((s) => ({
+      supplierProfiles: [
+        ...s.supplierProfiles.filter((sp) => sp.id !== uid),
+        mapSupplierProfileRow(data as SupplierProfileDbRow),
+      ],
+    }));
+    return { error: null };
+  },
 
   addSupplierProduct: (productData) => {
     const state = get();
@@ -913,11 +1000,37 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   })),
 
   // Admin approves a supplier
-  approveSupplier: (supplierProfileId) => set((state) => ({
-    supplierProfiles: state.supplierProfiles.map(p =>
-      p.id === supplierProfileId ? { ...p, isApproved: true } : p
-    )
-  })),
+  approveSupplier: (supplierProfileId) => {
+    const state = get();
+    set({
+      supplierProfiles: state.supplierProfiles.map((p) =>
+        p.id === supplierProfileId ? { ...p, isApproved: true } : p
+      ),
+      supplierProfile:
+        state.supplierProfile?.id === supplierProfileId
+          ? { ...state.supplierProfile, isApproved: true }
+          : state.supplierProfile,
+    });
+
+    supabase
+      .from('supplier_profiles')
+      .update({ is_approved: true, updated_at: new Date().toISOString() })
+      .eq('id', supplierProfileId)
+      .then(({ error }) => {
+        if (error) {
+          set((s) => ({
+            supplierProfiles: s.supplierProfiles.map((p) =>
+              p.id === supplierProfileId ? { ...p, isApproved: false } : p
+            ),
+            supplierProfile:
+              s.supplierProfile?.id === supplierProfileId
+                ? { ...s.supplierProfile, isApproved: false }
+                : s.supplierProfile,
+          }));
+          console.error('Failed to approve supplier:', error.message);
+        }
+      });
+  },
 
   // Admin releases commission
   releaseCommission: (commissionId) => set((state) => ({
