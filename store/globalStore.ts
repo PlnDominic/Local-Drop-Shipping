@@ -588,42 +588,134 @@ export const useGlobalStore = create<AppState>((set, get) => ({
     )
   })),
 
-  importProductToStore: (productId, sellingPrice, desc) => set((state) => {
+  importProductToStore: (productId, sellingPrice, desc) => {
+    const state = get();
     const uid = state.currentUserId;
-    if (!uid) return {};
+    if (!uid) return;
     const product = state.products.find((p) => p.id === productId);
-    if (!product) return {};
+    if (!product) return;
     const exists = state.dropshipperProducts.find(
       (dp) => dp.productId === productId && dp.dropshipperId === uid,
     );
-    if (exists) return {};
-    const newImported: DropshipperProduct = {
-      id: `local-${Date.now()}`,
+    if (exists) return;
+
+    const customDescription = desc || product.description;
+
+    // Optimistic local entry so the UI updates immediately.
+    const tempId = `local-${Date.now()}`;
+    const optimistic: DropshipperProduct = {
+      id: tempId,
       dropshipperId: uid,
       productId,
       product,
       sellingPrice,
-      customDescription: desc || product.description,
+      customDescription,
       isPublished: true,
     };
-    return { dropshipperProducts: [...state.dropshipperProducts, newImported] };
-  }),
+    set({ dropshipperProducts: [...state.dropshipperProducts, optimistic] });
 
-  togglePublishProduct: (dropshipperProductId) => set((state) => ({
-    dropshipperProducts: state.dropshipperProducts.map(dp =>
-      dp.id === dropshipperProductId ? { ...dp, isPublished: !dp.isPublished } : dp
-    )
-  })),
+    supabase
+      .from('dropshipper_products')
+      .insert({
+        dropshipper_id: uid,
+        product_id: productId,
+        custom_price: sellingPrice,
+        custom_description: customDescription,
+        is_published: true,
+      })
+      .select('id')
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          // Roll back the optimistic entry on failure.
+          set((s) => ({ dropshipperProducts: s.dropshipperProducts.filter((dp) => dp.id !== tempId) }));
+          console.error('Failed to import product to store:', error.message);
+          return;
+        }
+        // Replace the temp id with the real database id.
+        set((s) => ({
+          dropshipperProducts: s.dropshipperProducts.map((dp) =>
+            dp.id === tempId ? { ...dp, id: data.id } : dp,
+          ),
+        }));
+      });
+  },
 
-  updateImportedPrice: (dropshipperProductId, price) => set((state) => ({
-    dropshipperProducts: state.dropshipperProducts.map(dp =>
-      dp.id === dropshipperProductId ? { ...dp, sellingPrice: price } : dp
-    )
-  })),
+  togglePublishProduct: (dropshipperProductId) => {
+    const state = get();
+    const current = state.dropshipperProducts.find((dp) => dp.id === dropshipperProductId);
+    if (!current) return;
+    const nextPublished = !current.isPublished;
 
-  removeImportedProduct: (dropshipperProductId) => set((state) => ({
-    dropshipperProducts: state.dropshipperProducts.filter(dp => dp.id !== dropshipperProductId)
-  })),
+    set({
+      dropshipperProducts: state.dropshipperProducts.map((dp) =>
+        dp.id === dropshipperProductId ? { ...dp, isPublished: nextPublished } : dp
+      ),
+    });
+
+    supabase
+      .from('dropshipper_products')
+      .update({ is_published: nextPublished, updated_at: new Date().toISOString() })
+      .eq('id', dropshipperProductId)
+      .then(({ error }) => {
+        if (error) {
+          // Roll back on failure.
+          set((s) => ({
+            dropshipperProducts: s.dropshipperProducts.map((dp) =>
+              dp.id === dropshipperProductId ? { ...dp, isPublished: !nextPublished } : dp
+            ),
+          }));
+          console.error('Failed to update publish status:', error.message);
+        }
+      });
+  },
+
+  updateImportedPrice: (dropshipperProductId, price) => {
+    const state = get();
+    const previous = state.dropshipperProducts.find((dp) => dp.id === dropshipperProductId)?.sellingPrice;
+
+    set({
+      dropshipperProducts: state.dropshipperProducts.map((dp) =>
+        dp.id === dropshipperProductId ? { ...dp, sellingPrice: price } : dp
+      ),
+    });
+
+    supabase
+      .from('dropshipper_products')
+      .update({ custom_price: price, updated_at: new Date().toISOString() })
+      .eq('id', dropshipperProductId)
+      .then(({ error }) => {
+        if (error && previous !== undefined) {
+          set((s) => ({
+            dropshipperProducts: s.dropshipperProducts.map((dp) =>
+              dp.id === dropshipperProductId ? { ...dp, sellingPrice: previous } : dp
+            ),
+          }));
+          console.error('Failed to update price:', error.message);
+        }
+      });
+  },
+
+  removeImportedProduct: (dropshipperProductId) => {
+    const state = get();
+    const removed = state.dropshipperProducts.find((dp) => dp.id === dropshipperProductId);
+
+    set({
+      dropshipperProducts: state.dropshipperProducts.filter((dp) => dp.id !== dropshipperProductId),
+    });
+
+    supabase
+      .from('dropshipper_products')
+      .delete()
+      .eq('id', dropshipperProductId)
+      .then(({ error }) => {
+        if (error && removed) {
+          // Roll back — re-add the item if the delete failed server-side.
+          set((s) => ({ dropshipperProducts: [...s.dropshipperProducts, removed] }));
+          console.error('Failed to remove product:', error.message);
+        }
+      });
+  },
 
   addProductReview: (productId, review) => {
     const rating = Math.max(1, Math.min(5, Math.round(review.rating)));
