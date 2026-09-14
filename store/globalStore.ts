@@ -543,19 +543,49 @@ export const useGlobalStore = create<AppState>((set, get) => ({
 
   clearCart: () => set({ cart: [] }),
 
-  addSupplierProduct: (productData) => set((state) => {
+  addSupplierProduct: (productData) => {
+    const state = get();
     const uid = state.currentUserId;
-    if (!uid) return {};
+    if (!uid) return;
     const supplierName = state.supplierProfiles.find((s) => s.userId === uid)?.businessName ?? '';
-    const newProduct: Product = {
+
+    const tempId = `local-${Date.now()}`;
+    const optimistic: Product = {
       ...productData,
-      id: `local-${Date.now()}`,
+      id: tempId,
       supplierId: uid,
       supplierName,
       createdAt: new Date().toISOString(),
     };
-    return { products: [newProduct, ...state.products] };
-  }),
+    set({ products: [optimistic, ...state.products] });
+
+    supabase
+      .from('products')
+      .insert({
+        supplier_id: uid,
+        category_id: productData.categoryId || null,
+        name: productData.name,
+        description: productData.description,
+        images: productData.images,
+        cost_price: productData.costPrice,
+        suggested_price: productData.suggestedPrice,
+        stock_qty: productData.stockQty,
+        sku: productData.sku,
+        is_active: productData.isActive,
+      })
+      .select('id')
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          set((s) => ({ products: s.products.filter((p) => p.id !== tempId) }));
+          console.error('Failed to save product:', error.message);
+          return;
+        }
+        set((s) => ({
+          products: s.products.map((p) => (p.id === tempId ? { ...p, id: data.id } : p)),
+        }));
+      });
+  },
 
   addSupplierProductsBulk: (rows) => {
     const state = get();
@@ -563,9 +593,10 @@ export const useGlobalStore = create<AppState>((set, get) => ({
     if (!uid || rows.length === 0) return 0;
     const supplierName = state.supplierProfiles.find((s) => s.userId === uid)?.businessName ?? '';
     const now = Date.now();
+    const tempIds = rows.map((_, idx) => `local-${now}-${idx}`);
     const newProducts: Product[] = rows.map((row, idx) => ({
       ...row,
-      id: `local-${now}-${idx}`,
+      id: tempIds[idx],
       supplierId: uid,
       supplierName,
       createdAt: new Date().toISOString(),
@@ -573,12 +604,62 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       variants: [],
     }));
     set({ products: [...newProducts, ...state.products] });
+
+    supabase
+      .from('products')
+      .insert(
+        rows.map((row) => ({
+          supplier_id: uid,
+          category_id: row.categoryId || null,
+          name: row.name,
+          description: row.description,
+          images: row.images,
+          cost_price: row.costPrice,
+          suggested_price: row.suggestedPrice,
+          stock_qty: row.stockQty,
+          sku: row.sku,
+          is_active: row.isActive,
+        })),
+      )
+      .select('id')
+      .then(({ data, error }) => {
+        if (error) {
+          set((s) => ({ products: s.products.filter((p) => !tempIds.includes(p.id)) }));
+          console.error('Failed to save bulk products:', error.message);
+          return;
+        }
+        set((s) => ({
+          products: s.products.map((p) => {
+            const idx = tempIds.indexOf(p.id);
+            return idx !== -1 && data[idx] ? { ...p, id: data[idx].id } : p;
+          }),
+        }));
+      });
+
     return newProducts.length;
   },
 
-  updateSupplierProductStock: (productId, newQty) => set((state) => ({
-    products: state.products.map(p => p.id === productId ? { ...p, stockQty: newQty } : p)
-  })),
+  updateSupplierProductStock: (productId, newQty) => {
+    const state = get();
+    const previous = state.products.find((p) => p.id === productId)?.stockQty;
+
+    set({
+      products: state.products.map((p) => (p.id === productId ? { ...p, stockQty: newQty } : p)),
+    });
+
+    supabase
+      .from('products')
+      .update({ stock_qty: newQty, updated_at: new Date().toISOString() })
+      .eq('id', productId)
+      .then(({ error }) => {
+        if (error && previous !== undefined) {
+          set((s) => ({
+            products: s.products.map((p) => (p.id === productId ? { ...p, stockQty: previous } : p)),
+          }));
+          console.error('Failed to update stock:', error.message);
+        }
+      });
+  },
 
   updateVariantStock: (productId, variantId, newQty) => set((state) => ({
     products: state.products.map(p =>
