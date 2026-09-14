@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
 import type { Product } from '../store/globalStore';
 import { useToast } from '../components/Toast';
@@ -27,8 +27,10 @@ import {
   MessageCircle,
   Sliders,
   ExternalLink,
+  UploadCloud,
 } from 'lucide-react';
 import { updateDropshipperStoreCustomization } from '../lib/supabase/queries';
+import { supabase } from '../lib/supabase/client';
 
 const formatMoney = (amount: number) =>
   `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
@@ -74,6 +76,8 @@ export const DropshipperDashboard: React.FC = () => {
   const [twitter, setTwitter] = useState(dropshipperProfile?.socialLinks?.twitter || '');
   const [selectedFeatured, setSelectedFeatured] = useState<string[]>(dropshipperProfile?.featuredProductIds || []);
   const [savingCustomization, setSavingCustomization] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const bannerFileRef = useRef<HTMLInputElement>(null);
 
   // Sync state if dropshipperProfile loads late
   React.useEffect(() => {
@@ -90,6 +94,37 @@ export const DropshipperDashboard: React.FC = () => {
       if (dropshipperProfile.featuredProductIds) setSelectedFeatured(dropshipperProfile.featuredProductIds);
     }
   }, [dropshipperProfile]);
+
+  const handleBannerFile = async (file: File | undefined) => {
+    if (!file || !uid) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Please choose an image file.', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image must be under 5 MB.', 'error');
+      return;
+    }
+
+    setUploadingBanner(true);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `${uid}/banner-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('storefront-assets')
+        .upload(path, file, { upsert: true, cacheControl: '3600' });
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('storefront-assets').getPublicUrl(path);
+      setBannerUrl(data.publicUrl);
+      showToast('Banner uploaded — remember to save your changes.', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to upload banner', 'error');
+    } finally {
+      setUploadingBanner(false);
+      if (bannerFileRef.current) bannerFileRef.current.value = '';
+    }
+  };
 
   const handleSaveCustomization = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -635,8 +670,26 @@ export const DropshipperDashboard: React.FC = () => {
                     <ImageIcon size={16} /> Hero Banner Image
                   </div>
                   <p className="text-xs text-[#777]">
-                    Provide a direct image URL to set as your hero section background. If left empty, a rich dynamic gradient based on your brand color will be used.
+                    Upload an image or paste a direct URL to set as your hero section background. If left empty, a rich dynamic gradient based on your brand color will be used.
                   </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => bannerFileRef.current?.click()}
+                      disabled={uploadingBanner}
+                      className="h-10 flex-shrink-0 rounded border border-gray-200 px-3 text-xs font-black text-[#151515] hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                    >
+                      <UploadCloud size={14} />
+                      {uploadingBanner ? 'Uploading…' : 'Upload Image'}
+                    </button>
+                    <input
+                      ref={bannerFileRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleBannerFile(e.target.files?.[0])}
+                    />
+                  </div>
                   <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
                       Image URL

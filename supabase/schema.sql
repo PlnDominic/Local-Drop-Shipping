@@ -628,3 +628,29 @@ end;
 $$;
 
 grant execute on function public.update_order_status(uuid, text) to authenticated;
+
+-- ============================================================================
+-- Storage: public bucket for storefront assets (hero banners, logos).
+-- Files are keyed as "<user_id>/<filename>" so the RLS policies below can
+-- scope writes to the owning user by matching the first path segment.
+-- ============================================================================
+
+insert into storage.buckets (id, name, public)
+values ('storefront-assets', 'storefront-assets', true)
+on conflict (id) do nothing;
+
+drop policy if exists "storefront assets are publicly readable" on storage.objects;
+create policy "storefront assets are publicly readable" on storage.objects for select
+  using (bucket_id = 'storefront-assets');
+
+drop policy if exists "owner uploads own storefront assets" on storage.objects;
+create policy "owner uploads own storefront assets" on storage.objects for insert
+  with check (bucket_id = 'storefront-assets' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "owner updates own storefront assets" on storage.objects;
+create policy "owner updates own storefront assets" on storage.objects for update
+  using (bucket_id = 'storefront-assets' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "owner deletes own storefront assets" on storage.objects;
+create policy "owner deletes own storefront assets" on storage.objects for delete
+  using (bucket_id = 'storefront-assets' and (storage.foldername(name))[1] = auth.uid()::text);
