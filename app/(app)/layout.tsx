@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigation } from '../../components/Navigation';
+import { SiteHeader } from '../../components/SiteHeader';
 
 export default function AppLayout({
   children
@@ -8,7 +8,7 @@ export default function AppLayout({
 }>) {
   return (
     <>
-      <Navigation />
+      <SiteHeader />
       {children}
     </>
   );

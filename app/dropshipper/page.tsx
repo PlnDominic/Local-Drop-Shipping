@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth/AuthProvider';
 import { DropshipperDashboard } from '../../views/DropshipperDashboard';
 import { DropshipperRegister } from '../../views/DropshipperRegister';
-import { Navigation } from '../../components/Navigation';
+import { SiteHeader } from '../../components/SiteHeader';
 import { supabase } from '../../lib/supabase/client';
 import { ArrowLeft, ArrowRight, User } from 'lucide-react';
 
@@ -33,7 +33,7 @@ export default function DropshipperPage() {
   if (session && profile && (profile.role === 'dropshipper' || profile.role === 'admin')) {
     return (
       <>
-        <Navigation />
+        <SiteHeader />
         <DropshipperDashboard />
       </>
     );

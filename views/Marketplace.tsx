@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  ChevronDown,
   CircleDollarSign,
   CreditCard,
   Gift,
@@ -22,16 +21,15 @@ import {
   Star,
   Tag,
   Truck,
-  User,
   X,
   Zap
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useGlobalStore } from '../store/globalStore';
 import type { DropshipperProduct, ProductReview } from '../store/globalStore';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../lib/auth/AuthProvider';
+import { SiteHeader } from '../components/SiteHeader';
 
 const heroImage =
   'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=90';
@@ -399,14 +397,7 @@ export const Marketplace: React.FC = () => {
   } = useGlobalStore();
 
   const { showToast } = useToast();
-  const { profile, signOut } = useAuth();
-  const router = useRouter();
-
-  const dashboardHref =
-    profile?.role === 'supplier' ? '/supplier'
-    : profile?.role === 'admin' ? '/admin'
-    : profile?.role === 'dropshipper' ? '/dropshipper'
-    : null;
+  const { profile } = useAuth();
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
@@ -420,15 +411,11 @@ export const Marketplace: React.FC = () => {
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
-  const [accountOpen, setAccountOpen] = useState(false);
-  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [detailProduct, setDetailProduct] = useState<DropshipperProduct | null>(null);
   const [promoInput, setPromoInput] = useState('');
   const [promoError, setPromoError] = useState('');
-
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setIsLoading(false), 1000);
@@ -599,202 +586,14 @@ export const Marketplace: React.FC = () => {
   return (
     <main className="min-h-screen bg-[#f4f4f4] text-[#1c1c1c]">
 
-      {/* ── Announcement Bar ── */}
-      <div className="bg-[#151515] text-white py-2 text-[11px] font-semibold tracking-wide">
-        <div className="max-w-[1280px] mx-auto px-4 flex items-center justify-between gap-2 flex-wrap">
-          <span>🎉 Use code <span className="font-black text-[#f04438]">GHANA20</span> for 20% off your first order</span>
-          <span className="hidden sm:inline-flex items-center gap-3">
-            <span className="inline-flex items-center gap-1"><Phone size={11} /> +233 55 660 9232</span>
-            <span className="text-gray-500">|</span>
-            <span className="inline-flex items-center gap-1"><Phone size={11} /> +233 54 285 5399</span>
-          </span>
-        </div>
-      </div>
-
-      {/* ── Header ── */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
-        <div className="max-w-[1280px] mx-auto px-4 h-16 flex items-center gap-4">
-
-          {/* Logo */}
-          <a
-            href="#"
-            onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className="flex-shrink-0 font-black text-[#151515] leading-tight text-[13px] sm:text-[17px]"
-          >
-            <span className="hidden sm:inline">Local Drop Shipping </span>
-            <span className="sm:hidden">LDS </span>
-            <span className="text-[#f04438]">GH</span>
-          </a>
-
-          {/* Search bar */}
-          <div className="flex-1 min-w-0 max-w-xl mx-auto">
-            <div className="flex h-10 border border-gray-200 rounded overflow-hidden">
-              <select
-                aria-label="Category"
-                value={activeCategory}
-                onChange={(e) => setActiveCategory(e.target.value)}
-                className="hidden sm:block border-r border-gray-200 bg-[#f7f7f7] px-3 text-[11px] font-semibold text-[#444] outline-none flex-shrink-0"
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.label}</option>
-                ))}
-              </select>
-              <input
-                ref={searchInputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                aria-label="Search products"
-                placeholder="Search products..."
-                className="flex-1 min-w-0 px-3 text-[12px] outline-none"
-              />
-              <button
-                type="button"
-                aria-label="Search"
-                className="flex-shrink-0 bg-[#f04438] px-3 sm:px-4 text-white hover:bg-[#c0392b] transition-colors"
-              >
-                <Search size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* Icons */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              type="button"
-              aria-label="Wishlist"
-              className="hidden sm:flex flex-col items-center gap-0.5 p-2 text-[#555] hover:text-[#f04438] transition-colors"
-            >
-              <Heart size={20} />
-              <span className="text-[9px] font-semibold">Wishlist</span>
-            </button>
-
-            <div className="relative">
-              <button
-                type="button"
-                aria-label="Account"
-                onClick={() => setAccountOpen((v) => !v)}
-                className="flex flex-col items-center gap-0.5 p-2 text-[#555] hover:text-[#151515] transition-colors"
-              >
-                <User size={20} />
-                <span className="hidden sm:block text-[9px] font-semibold">Account</span>
-              </button>
-              {accountOpen && (
-                <div className="absolute right-0 top-14 z-50 w-56 border border-[#ededed] bg-white shadow-lg rounded">
-                  {profile ? (
-                    <>
-                      <div className="border-b border-[#ededed] px-4 py-3">
-                        <p className="text-sm font-black text-[#151515] truncate">{profile.fullName || 'Account'}</p>
-                        <p className="text-[11px] text-[#777] truncate">{profile.email}</p>
-                      </div>
-                      <div className="py-1">
-                        {dashboardHref && (
-                          <Link
-                            href={dashboardHref}
-                            onClick={() => setAccountOpen(false)}
-                            className="block w-full px-4 py-2 text-left text-[12px] font-semibold text-[#333] hover:bg-[#f5f5f5]"
-                          >
-                            My Dashboard
-                          </Link>
-                        )}
-                        <button
-                          type="button"
-                          onClick={async () => { setAccountOpen(false); await signOut(); router.push('/'); }}
-                          className="w-full px-4 py-2 text-left text-[12px] font-semibold text-[#f04438] hover:bg-[#f5f5f5]"
-                        >
-                          Sign Out
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="p-3 space-y-2">
-                      <p className="px-1 text-[11px] text-[#777]">Sign in to track orders and earn commissions.</p>
-                      <Link
-                        href="/login"
-                        onClick={() => setAccountOpen(false)}
-                        className="block h-9 rounded bg-[#151515] text-center text-[12px] font-black leading-9 text-white hover:bg-[#f04438] transition-colors"
-                      >
-                        Sign In
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              aria-label="Cart"
-              onClick={() => setCartOpen(true)}
-              className="relative flex flex-col items-center gap-0.5 p-2 text-[#555] hover:text-[#151515] transition-colors"
-            >
-              <ShoppingCart size={20} />
-              <span className="hidden sm:block text-[9px] font-semibold">Cart</span>
-              {cartCount > 0 && (
-                <span className="absolute right-1 top-1 grid h-[16px] min-w-[16px] place-items-center rounded-full bg-[#f04438] px-1 text-[9px] font-black text-white">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Nav Bar ── */}
-      <nav className="bg-[#151515] text-white relative z-20">
-        <div className="max-w-[1280px] mx-auto px-4 flex items-center h-11 gap-6 text-[12px] font-semibold">
-          <button
-            type="button"
-            onClick={() => setCategoryMenuOpen((v) => !v)}
-            className="flex items-center gap-2 bg-[#f04438] h-full px-4 font-bold hover:bg-[#c0392b] transition-colors flex-shrink-0"
-          >
-            <LayoutGrid size={14} />
-            All Categories
-            <ChevronDown size={13} className={categoryMenuOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
-          </button>
-
-          {[
-            { label: 'Marketplace', href: '/' },
-            { label: 'New Arrivals', href: '/' },
-            { label: 'Supplier Portal', href: '/supplier' },
-            { label: 'Start Dropshipping', href: '/dropshipper' },
-            { label: 'API Docs', href: '/docs' },
-          ].map(({ label, href }) => (
-            <Link key={label} href={href} className="hidden md:block whitespace-nowrap hover:text-[#f04438] transition-colors">
-              {label}
-            </Link>
-          ))}
-
-          <div className="ml-auto flex items-center gap-2 text-[#f04438] font-black hidden md:flex">
-            <Zap size={14} />
-            Special Offer Today!
-          </div>
-        </div>
-
-        {/* Category dropdown */}
-        {categoryMenuOpen && (
-          <div className="absolute left-0 top-full w-64 bg-white text-[#151515] shadow-xl rounded-br-lg z-50 border border-gray-100">
-            {categories.map((cat) => {
-              const Icon = cat.icon;
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => { setActiveCategory(cat.id); setCategoryMenuOpen(false); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-[12px] font-semibold hover:bg-[#f7f7f7] transition-colors ${activeCategory === cat.id ? 'text-[#f04438]' : 'text-[#333]'}`}
-                >
-                  <Icon size={15} className={activeCategory === cat.id ? 'text-[#f04438]' : 'text-[#999]'} />
-                  {cat.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </nav>
-
-      {/* Click-away for category menu */}
-      {categoryMenuOpen && (
-        <div className="fixed inset-0 z-10" onClick={() => setCategoryMenuOpen(false)} />
-      )}
+      <SiteHeader
+        categories={categories}
+        activeCategory={activeCategory}
+        onCategoryChange={setActiveCategory}
+        query={query}
+        onQueryChange={setQuery}
+        onCartClick={() => setCartOpen(true)}
+      />
 
       <div className="max-w-[1280px] mx-auto px-4 py-5">
 
@@ -1555,11 +1354,6 @@ export const Marketplace: React.FC = () => {
             </button>
           </div>
         </div>
-      )}
-
-      {/* Click-away for account dropdown */}
-      {accountOpen && (
-        <div className="fixed inset-0 z-[29]" onClick={() => setAccountOpen(false)} />
       )}
     </main>
   );
