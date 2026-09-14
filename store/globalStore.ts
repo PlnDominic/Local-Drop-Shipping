@@ -29,6 +29,14 @@ export interface DropshipperProfile {
   storeName: string;
   storeSlug: string;
   commissionRate: number;
+  // Storefront customization
+  themeColor: string;
+  bannerUrl: string;
+  tagline: string;
+  announcement: string;
+  whatsapp: string;
+  socialLinks: Record<string, string>;
+  featuredProductIds: string[];
 }
 
 export interface Category {
@@ -160,9 +168,13 @@ interface AppState {
   mobilePreview: boolean;
   setMobilePreview: (active: boolean) => void;
 
-  // Current signed-in user (resolved from Supabase Auth; null when logged out)
+   // Current signed-in user (resolved from Supabase Auth; null when logged out)
   currentUserId: string | null;
   setCurrentUserId: (id: string | null) => void;
+
+  // Dropshipper profile for the current user (null when not a dropshipper)
+  dropshipperProfile: DropshipperProfile | null;
+  setDropshipperProfile: (profile: DropshipperProfile | null) => void;
 
   // Data hydration from Supabase
   hydrated: boolean;
@@ -274,6 +286,70 @@ function mapProductRow(p: ProductDbRow): Product {
   };
 }
 
+// ── Dev seed: appears when Supabase has no products ─────────────
+
+const SEED_PRODUCTS: Product[] = [
+  {
+    id: 'seed-product-1',
+    supplierId: 'seed-supplier-1',
+    supplierName: 'Bhra Joe Store',
+    categoryId: 'cat-1',
+    name: 'Samsung Galaxy S24 Ultra 256GB',
+    description: 'Latest Samsung Galaxy S24 Ultra with 256GB storage, titanium design, and advanced camera system. Black, brand new, sealed.',
+    images: [
+      'https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?auto=format&fit=crop&w=800&q=90',
+    ],
+    costPrice: 850,
+    suggestedPrice: 1200,
+    stockQty: 15,
+    sku: 'SGS24U-256-BLK',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    reviews: [],
+    variants: [],
+  },
+  {
+    id: 'seed-product-2',
+    supplierId: 'seed-supplier-1',
+    supplierName: 'Bhra Joe Store',
+    categoryId: 'cat-2',
+    name: "Women's Ankara Wrap Dress",
+    description: 'Beautiful Ankara print wrap dress for women. Vibrant colors, comfortable fit. Perfect for special occasions.',
+    images: [
+      'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=800&q=90',
+    ],
+    costPrice: 120,
+    suggestedPrice: 280,
+    stockQty: 20,
+    sku: 'AADRESS-M',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    reviews: [],
+    variants: [],
+  },
+];
+
+const SEED_DROPSHIPPER_PRODUCTS: DropshipperProduct[] = [
+  {
+    id: 'seed-dp-1',
+    dropshipperId: '27b5287a-46b8-4fd8-b5f2-8c2a1a7ded67',
+    productId: SEED_PRODUCTS[0].id,
+    product: SEED_PRODUCTS[0],
+    sellingPrice: 1099,
+    customDescription: 'Express delivery within 24 hours. Pay via MTN MoMo on delivery.',
+    isPublished: true,
+  },
+  {
+    id: 'seed-dp-2',
+    dropshipperId: '27b5287a-46b8-4fd8-b5f2-8c2a1a7ded67',
+    productId: SEED_PRODUCTS[1].id,
+    product: SEED_PRODUCTS[1],
+    sellingPrice: 249,
+    customDescription: 'Free delivery within Accra. Pay via MTN MoMo on delivery.',
+    isPublished: true,
+  },
+];
+
 export const useGlobalStore = create<AppState>((set, get) => ({
   activeRole: 'customer',
   setActiveRole: (role) => set({ activeRole: role }),
@@ -283,21 +359,19 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   currentUserId: null,
   setCurrentUserId: (id) => set({ currentUserId: id }),
 
+  dropshipperProfile: null,
+  setDropshipperProfile: (profile) => set({ dropshipperProfile: profile }),
+
   hydrated: false,
   hydrate: async () => {
     const uid = get().currentUserId;
     try {
-      const [catsRes, prodsRes, dpsRes] = await Promise.all([
+      const [catsRes, prodsRes] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
         supabase
           .from('products')
           .select('*, supplier_profiles(business_name)')
           .eq('is_active', true)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('dropshipper_products')
-          .select('*, products(*, supplier_profiles(business_name))')
-          .eq('is_published', true)
           .order('created_at', { ascending: false }),
       ]);
 
@@ -312,23 +386,27 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         mapProductRow(p as ProductDbRow),
       );
 
-      const dropshipperProducts: DropshipperProduct[] = (dpsRes.data ?? [])
-        .filter((d) => d.products)
-        .map((d) => ({
-          id: d.id,
-          dropshipperId: d.dropshipper_id,
-          productId: d.product_id,
-          product: mapProductRow(d.products as ProductDbRow),
-          sellingPrice: Number(d.custom_price),
-          customDescription: d.custom_description ?? (d.products as ProductDbRow).description,
-          isPublished: d.is_published,
-        }));
+      if (products.length === 0) {
+        products.push(...SEED_PRODUCTS);
+      }
 
+      let dropshipperProducts: DropshipperProduct[] = [];
       let wallets: Record<string, Wallet> = {};
       let transactions: Transaction[] = [];
+      let dropshipperProfile: DropshipperProfile | null = null;
 
       if (uid) {
-        const [walletRes, txRes] = await Promise.all([
+        const [dpsRes, dpProfileRes, walletRes, txRes] = await Promise.all([
+          supabase
+            .from('dropshipper_products')
+            .select('*, products(*, supplier_profiles(business_name))')
+            .eq('dropshipper_id', uid)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('dropshipper_profiles')
+            .select('*')
+            .eq('id', uid)
+            .maybeSingle(),
           supabase.from('wallets').select('*').eq('user_id', uid).maybeSingle(),
           supabase
             .from('wallet_transactions')
@@ -337,6 +415,36 @@ export const useGlobalStore = create<AppState>((set, get) => ({
             .order('created_at', { ascending: false })
             .limit(50),
         ]);
+
+        dropshipperProducts = (dpsRes.data ?? [])
+          .filter((d) => d.products)
+          .map((d) => ({
+            id: d.id,
+            dropshipperId: d.dropshipper_id,
+            productId: d.product_id,
+            product: mapProductRow(d.products as ProductDbRow),
+            sellingPrice: Number(d.custom_price),
+            customDescription: d.custom_description ?? (d.products as ProductDbRow).description,
+            isPublished: d.is_published,
+          }));
+
+        const dp = dpProfileRes.data;
+        if (dp) {
+          dropshipperProfile = {
+            id: dp.id,
+            userId: dp.id,
+            storeName: dp.store_name ?? '',
+            storeSlug: dp.store_slug ?? '',
+            commissionRate: Number(dp.commission_rate ?? 0),
+            themeColor: dp.theme_color ?? '#f04438',
+            bannerUrl: dp.banner_url ?? '',
+            tagline: dp.tagline ?? '',
+            announcement: dp.announcement ?? '',
+            whatsapp: dp.whatsapp ?? '',
+            socialLinks: dp.social_links ?? {},
+            featuredProductIds: dp.featured_product_ids ?? [],
+          };
+        }
 
         const w = walletRes.data;
         wallets = {
@@ -359,7 +467,11 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         }));
       }
 
-      set({ categories, products, dropshipperProducts, wallets, transactions, hydrated: true });
+      if (dropshipperProducts.length === 0) {
+        dropshipperProducts = SEED_DROPSHIPPER_PRODUCTS;
+      }
+
+      set({ categories, products, dropshipperProducts, dropshipperProfile, wallets, transactions, hydrated: true });
     } catch {
       // Surface an empty (not fake) state if Supabase is unreachable.
       set({ hydrated: true });

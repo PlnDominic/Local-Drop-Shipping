@@ -46,9 +46,11 @@ function LoginPageInner() {
 
   // Already signed in → leave the auth page.
   useEffect(() => {
-    if (session) router.replace('/');
-  }, [session, router]);
-
+  console.log('LOGIN PAGE AUTH:', {
+    session,
+    hasSession: !!session,
+  });
+}, [session]);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');

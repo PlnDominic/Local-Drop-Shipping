@@ -20,12 +20,20 @@ import {
   Package,
   TrendingUp,
   Share2,
+  Palette,
+  Sparkles,
+  Image as ImageIcon,
+  Globe,
+  MessageCircle,
+  Sliders,
+  ExternalLink,
 } from 'lucide-react';
+import { updateDropshipperStoreCustomization } from '../lib/supabase/queries';
 
 const formatMoney = (amount: number) =>
   `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
-type Tab = 'overview' | 'import' | 'my-store' | 'orders' | 'wallet';
+type Tab = 'overview' | 'import' | 'my-store' | 'customize' | 'orders' | 'wallet';
 
 export const DropshipperDashboard: React.FC = () => {
   const {
@@ -40,6 +48,7 @@ export const DropshipperDashboard: React.FC = () => {
     withdrawFunds,
     transactions,
     currentUserId,
+    dropshipperProfile,
   } = useGlobalStore();
 
   const { showToast } = useToast();
@@ -47,9 +56,80 @@ export const DropshipperDashboard: React.FC = () => {
   const uid = currentUserId ?? '';
 
   const firstName = profile?.fullName?.split(' ')[0] ?? '';
-  const storeName = firstName ? `${firstName}'s Store` : 'My Store';
+  const storeName = dropshipperProfile?.storeName ?? (firstName ? `${firstName}'s Store` : 'My Store');
+  const storeSlug = dropshipperProfile?.storeSlug ?? '';
+  const storefrontUrl = storeSlug ? `/store/${storeSlug}` : '';
 
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+
+  // Store customization state
+  const [themeColor, setThemeColor] = useState(dropshipperProfile?.themeColor || '#f04438');
+  const [bannerUrl, setBannerUrl] = useState(dropshipperProfile?.bannerUrl || '');
+  const [tagline, setTagline] = useState(dropshipperProfile?.tagline || '');
+  const [announcement, setAnnouncement] = useState(dropshipperProfile?.announcement || '');
+  const [whatsapp, setWhatsapp] = useState(dropshipperProfile?.whatsapp || '');
+  const [instagram, setInstagram] = useState(dropshipperProfile?.socialLinks?.instagram || '');
+  const [facebook, setFacebook] = useState(dropshipperProfile?.socialLinks?.facebook || '');
+  const [tiktok, setTiktok] = useState(dropshipperProfile?.socialLinks?.tiktok || '');
+  const [twitter, setTwitter] = useState(dropshipperProfile?.socialLinks?.twitter || '');
+  const [selectedFeatured, setSelectedFeatured] = useState<string[]>(dropshipperProfile?.featuredProductIds || []);
+  const [savingCustomization, setSavingCustomization] = useState(false);
+
+  // Sync state if dropshipperProfile loads late
+  React.useEffect(() => {
+    if (dropshipperProfile) {
+      if (dropshipperProfile.themeColor) setThemeColor(dropshipperProfile.themeColor);
+      if (dropshipperProfile.bannerUrl) setBannerUrl(dropshipperProfile.bannerUrl);
+      if (dropshipperProfile.tagline) setTagline(dropshipperProfile.tagline);
+      if (dropshipperProfile.announcement) setAnnouncement(dropshipperProfile.announcement);
+      if (dropshipperProfile.whatsapp) setWhatsapp(dropshipperProfile.whatsapp);
+      if (dropshipperProfile.socialLinks?.instagram) setInstagram(dropshipperProfile.socialLinks.instagram);
+      if (dropshipperProfile.socialLinks?.facebook) setFacebook(dropshipperProfile.socialLinks.facebook);
+      if (dropshipperProfile.socialLinks?.tiktok) setTiktok(dropshipperProfile.socialLinks.tiktok);
+      if (dropshipperProfile.socialLinks?.twitter) setTwitter(dropshipperProfile.socialLinks.twitter);
+      if (dropshipperProfile.featuredProductIds) setSelectedFeatured(dropshipperProfile.featuredProductIds);
+    }
+  }, [dropshipperProfile]);
+
+  const handleSaveCustomization = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uid) return;
+    setSavingCustomization(true);
+    try {
+      await updateDropshipperStoreCustomization(uid, {
+        themeColor,
+        bannerUrl: bannerUrl || null,
+        tagline: tagline || null,
+        announcement: announcement || null,
+        whatsapp: whatsapp || null,
+        socialLinks: {
+          ...(instagram ? { instagram } : {}),
+          ...(facebook ? { facebook } : {}),
+          ...(tiktok ? { tiktok } : {}),
+          ...(twitter ? { twitter } : {}),
+        },
+        featuredProductIds: selectedFeatured,
+      });
+      showToast('Storefront customization saved!', 'success');
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to save customization', 'error');
+    } finally {
+      setSavingCustomization(false);
+    }
+  };
+
+  const toggleFeaturedProduct = (id: string) => {
+    setSelectedFeatured((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((item) => item !== id);
+      }
+      if (prev.length >= 4) {
+        showToast('You can pin up to 4 featured products.', 'error');
+        return prev;
+      }
+      return [...prev, id];
+    });
+  };
 
   // Importer state
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -222,18 +302,34 @@ export const DropshipperDashboard: React.FC = () => {
                     >
                       Import Products <ArrowRight size={14} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => { setActiveTab('my-store'); }}
-                      className="h-9 rounded border border-gray-200 px-5 text-[11px] font-black text-[#151515] hover:border-[#f04438] hover:text-[#f04438] transition-colors flex items-center gap-1.5"
-                    >
-                      <Share2 size={13} /> My Storefront
-                    </button>
+                    {storefrontUrl ? (
+                      <a
+                        href={storefrontUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="h-9 rounded border border-[#f04438] px-5 text-[11px] font-black text-[#f04438] hover:bg-[#f04438]/10 transition-colors flex items-center gap-1.5"
+                      >
+                        <Share2 size={13} /> View Storefront
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => { setActiveTab('import'); }}
+                        className="h-9 rounded border border-gray-200 px-5 text-[11px] font-black text-[#151515] hover:border-[#f04438] hover:text-[#f04438] transition-colors flex items-center gap-1.5"
+                      >
+                        <PlusCircle size={13} /> Publish Products
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="bg-[#f7f7f7] rounded p-5 space-y-2 text-[12px]">
                   <p className="text-[10px] font-black uppercase tracking-wider text-[#777]">Your storefront</p>
                   <p className="font-black text-[#151515]">{storeName}</p>
+                  {storeSlug && (
+                    <p className="text-[#777] font-mono text-[11px] break-all">
+                      {window.location.origin + storefrontUrl}
+                    </p>
+                  )}
                   <p className="text-[#777]">
                     Published items: <strong className="text-[#151515]">{dropshipperProducts.filter((d) => d.isPublished).length}</strong>
                   </p>
@@ -391,6 +487,312 @@ export const DropshipperDashboard: React.FC = () => {
               </div>
             )}
           </section>
+        )}
+
+        {/* ── CUSTOMIZE STORE ── */}
+        {activeTab === 'customize' && (
+          <form onSubmit={handleSaveCustomization} className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-lg border border-gray-100">
+              <div>
+                <h2 className="text-lg font-black text-[#151515]">Storefront Customizer</h2>
+                <p className="text-xs text-[#777]">
+                  Design your custom storefront, set brand colors, banner, announcement bar, and social contact details.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {storefrontUrl && (
+                  <a
+                    href={storefrontUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="h-10 px-4 rounded-lg border border-gray-200 text-xs font-black text-[#151515] hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5"
+                  >
+                    <ExternalLink size={14} /> View Live Store
+                  </a>
+                )}
+                <button
+                  type="submit"
+                  disabled={savingCustomization}
+                  className="h-10 px-6 rounded-lg bg-[#151515] hover:bg-[#f04438] text-xs font-black text-white transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  <Sparkles size={14} />
+                  {savingCustomization ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              {/* Left Column: Branding & Color */}
+              <div className="space-y-5">
+                {/* Brand Color */}
+                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
+                    <Palette size={16} style={{ color: themeColor }} /> Brand Color Scheme
+                  </div>
+                  <p className="text-xs text-[#777]">
+                    Selected color will be applied to your storefront's buttons, badges, discount banners, and hero accents.
+                  </p>
+
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={themeColor}
+                      onChange={(e) => setThemeColor(e.target.value)}
+                      className="h-12 w-12 rounded cursor-pointer border border-gray-200 p-1"
+                    />
+                    <div className="flex-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase">HEX Code</label>
+                      <input
+                        type="text"
+                        value={themeColor}
+                        onChange={(e) => setThemeColor(e.target.value)}
+                        placeholder="#f04438"
+                        className="w-full h-9 rounded border border-gray-200 px-3 text-xs font-black text-[#151515] uppercase focus:border-gray-400 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Preset Colors */}
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-2">Preset Accents</label>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {[
+                        { label: 'Sunset Red', color: '#f04438' },
+                        { label: 'Emerald Green', color: '#10b981' },
+                        { label: 'Sapphire Blue', color: '#3b82f6' },
+                        { label: 'Royal Purple', color: '#8b5cf6' },
+                        { label: 'Amber Gold', color: '#f59e0b' },
+                        { label: 'Rose Pink', color: '#ec4899' },
+                        { label: 'Midnight Black', color: '#18181b' },
+                      ].map((preset) => (
+                        <button
+                          key={preset.color}
+                          type="button"
+                          onClick={() => setThemeColor(preset.color)}
+                          className="h-7 w-7 rounded-full border-2 transition-transform hover:scale-110"
+                          style={{
+                            backgroundColor: preset.color,
+                            borderColor: themeColor === preset.color ? '#151515' : 'transparent',
+                          }}
+                          title={preset.label}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Announcement Bar */}
+                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
+                    <Sliders size={16} /> Top Promo Strip
+                  </div>
+                  <p className="text-xs text-[#777]">
+                    Display an urgent promotional bar at the very top of your storefront.
+                  </p>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                      Announcement message
+                    </label>
+                    <input
+                      type="text"
+                      value={announcement}
+                      onChange={(e) => setAnnouncement(e.target.value)}
+                      placeholder="e.g. Free delivery across Accra on orders over GHS 250! 🚚"
+                      className="w-full h-10 rounded border border-gray-200 px-3 text-xs text-[#151515] focus:border-gray-400 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Tagline & Identity */}
+                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
+                    <Sparkles size={16} /> Identity & Tagline
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                      Store Catchphrase / Tagline
+                    </label>
+                    <input
+                      type="text"
+                      value={tagline}
+                      onChange={(e) => setTagline(e.target.value)}
+                      placeholder="e.g. Quality electronics & lifestyle essentials in Ghana"
+                      className="w-full h-10 rounded border border-gray-200 px-3 text-xs text-[#151515] focus:border-gray-400 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Middle Column: Visual Assets & Social */}
+              <div className="space-y-5">
+                {/* Hero Banner */}
+                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
+                    <ImageIcon size={16} /> Hero Banner Image
+                  </div>
+                  <p className="text-xs text-[#777]">
+                    Provide a direct image URL to set as your hero section background. If left empty, a rich dynamic gradient based on your brand color will be used.
+                  </p>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                      Image URL
+                    </label>
+                    <input
+                      type="url"
+                      value={bannerUrl}
+                      onChange={(e) => setBannerUrl(e.target.value)}
+                      placeholder="https://images.unsplash.com/photo-..."
+                      className="w-full h-10 rounded border border-gray-200 px-3 text-xs text-[#151515] focus:border-gray-400 outline-none"
+                    />
+                  </div>
+                  {bannerUrl && (
+                    <div className="h-28 rounded-lg overflow-hidden border border-gray-200 relative">
+                      <img src={bannerUrl} alt="Banner Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white text-[11px] font-black">
+                        Preview
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* WhatsApp & Contacts */}
+                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
+                    <MessageCircle size={16} className="text-emerald-500" /> WhatsApp Direct Chat
+                  </div>
+                  <p className="text-xs text-[#777]">
+                    Enables a floating WhatsApp contact button on your storefront so buyers can chat with you instantly.
+                  </p>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                      WhatsApp Phone Number
+                    </label>
+                    <input
+                      type="text"
+                      value={whatsapp}
+                      onChange={(e) => setWhatsapp(e.target.value)}
+                      placeholder="+233 24 123 4567"
+                      className="w-full h-10 rounded border border-gray-200 px-3 text-xs text-[#151515] focus:border-gray-400 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Social Links */}
+                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
+                    <Globe size={16} /> Social Media Links
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Instagram handle / URL</label>
+                      <input
+                        type="text"
+                        value={instagram}
+                        onChange={(e) => setInstagram(e.target.value)}
+                        placeholder="@yourbrand or https://instagram.com/..."
+                        className="w-full h-9 rounded border border-gray-200 px-3 text-xs text-[#151515] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">TikTok handle / URL</label>
+                      <input
+                        type="text"
+                        value={tiktok}
+                        onChange={(e) => setTiktok(e.target.value)}
+                        placeholder="@yourbrand"
+                        className="w-full h-9 rounded border border-gray-200 px-3 text-xs text-[#151515] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Facebook page</label>
+                      <input
+                        type="text"
+                        value={facebook}
+                        onChange={(e) => setFacebook(e.target.value)}
+                        placeholder="yourbrand"
+                        className="w-full h-9 rounded border border-gray-200 px-3 text-xs text-[#151515] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Twitter / X handle</label>
+                      <input
+                        type="text"
+                        value={twitter}
+                        onChange={(e) => setTwitter(e.target.value)}
+                        placeholder="@yourbrand"
+                        className="w-full h-9 rounded border border-gray-200 px-3 text-xs text-[#151515] outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Featured Products Selector */}
+              <div className="space-y-5">
+                <div className="bg-white rounded-lg border border-gray-100 p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-black text-[#151515] uppercase tracking-wider">
+                      <Sparkles size={16} style={{ color: themeColor }} /> Featured Picks ({selectedFeatured.length}/4)
+                    </div>
+                  </div>
+                  <p className="text-xs text-[#777]">
+                    Select up to 4 imported products to pin directly in the "Featured Picks" section of your storefront.
+                  </p>
+
+                  {dropshipperProducts.length === 0 ? (
+                    <div className="p-6 text-center border border-dashed border-gray-200 rounded-lg">
+                      <p className="text-xs text-[#777]">You have no imported products yet. Import products to feature them here.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[440px] overflow-y-auto pr-1">
+                      {dropshipperProducts.map((dp) => {
+                        const isPinned = selectedFeatured.includes(dp.id) || selectedFeatured.includes(dp.productId);
+                        return (
+                          <div
+                            key={dp.id}
+                            onClick={() => toggleFeaturedProduct(dp.id)}
+                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                              isPinned
+                                ? 'border-[#151515] bg-[#151515]/5 shadow-xs'
+                                : 'border-gray-100 bg-[#fafafa] hover:border-gray-300'
+                            }`}
+                          >
+                            <img
+                              src={dp.product.images[0]}
+                              alt=""
+                              className="h-10 w-10 object-contain rounded bg-white p-1 border border-gray-200 flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-xs font-bold text-[#151515] line-clamp-1">{dp.product.name}</h4>
+                              <p className="text-[11px] font-black text-[#777]">{formatMoney(dp.sellingPrice)}</p>
+                            </div>
+                            <div
+                              className={`h-5 w-5 rounded-full border grid place-items-center text-[10px] font-black ${
+                                isPinned ? 'bg-[#151515] text-white border-[#151515]' : 'border-gray-300 bg-white'
+                              }`}
+                            >
+                              {isPinned && '✓'}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100 pt-4 flex justify-end">
+              <button
+                type="submit"
+                disabled={savingCustomization}
+                className="h-11 px-8 rounded-lg bg-[#151515] hover:bg-[#f04438] text-xs font-black text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                <Sparkles size={15} />
+                {savingCustomization ? 'Saving Changes...' : 'Save Storefront Customization'}
+              </button>
+            </div>
+          </form>
         )}
 
         {/* ── ORDERS ── */}
