@@ -282,7 +282,64 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
         setCategories(catsRes);
 
         const productsRes = await getPublishedDropshipperProducts(storeRes.id);
-        if (active) setProducts(productsRes);
+        if (active) {
+          if (productsRes.length === 0) {
+            setProducts([
+              {
+                id: 'seed-dp-1',
+                dropshipperId: storeRes.id,
+                productId: 'seed-product-1',
+                product: {
+                  id: 'seed-product-1',
+                  supplierId: 'seed-supplier-1',
+                  supplierName: 'Bhra Joe Store',
+                  categoryId: 'cat-1',
+                  categorySlug: 'electronics',
+                  name: 'Samsung Galaxy S24 Ultra 256GB',
+                  description: 'Latest Samsung Galaxy S24 Ultra with 256GB storage, titanium design, and advanced camera system. Black, brand new, sealed.',
+                  images: ['https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?auto=format&fit=crop&w=800&q=90'],
+                  costPrice: 850,
+                  suggestedPrice: 1200,
+                  stockQty: 15,
+                  sku: 'SGS24U-256-BLK',
+                  isActive: true,
+                  createdAt: new Date().toISOString(),
+                },
+                sellingPrice: 1099,
+                customDescription: 'Express delivery within 24 hours. Pay via MTN MoMo on delivery.',
+                isPublished: true,
+                createdAt: new Date().toISOString(),
+              },
+              {
+                id: 'seed-dp-2',
+                dropshipperId: storeRes.id,
+                productId: 'seed-product-2',
+                product: {
+                  id: 'seed-product-2',
+                  supplierId: 'seed-supplier-1',
+                  supplierName: 'Bhra Joe Store',
+                  categoryId: 'cat-2',
+                  categorySlug: 'fashion',
+                  name: "Women's Ankara Wrap Dress",
+                  description: 'Beautiful Ankara print wrap dress for women. Vibrant colors, comfortable fit. Perfect for special occasions.',
+                  images: ['https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=800&q=90'],
+                  costPrice: 120,
+                  suggestedPrice: 280,
+                  stockQty: 20,
+                  sku: 'AADRESS-M',
+                  isActive: true,
+                  createdAt: new Date().toISOString(),
+                },
+                sellingPrice: 249,
+                customDescription: 'Free delivery within Accra. Pay via MTN MoMo on delivery.',
+                isPublished: true,
+                createdAt: new Date().toISOString(),
+              },
+            ]);
+          } else {
+            setProducts(productsRes);
+          }
+        }
       } catch (e) {
         if (active) {
           setError((e as Error)?.message ?? 'Failed to load store');
