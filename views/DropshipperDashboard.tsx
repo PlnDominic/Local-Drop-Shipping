@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
 import type { Product } from '../store/globalStore';
 import { useToast } from '../components/Toast';
+import { EstimatedDelivery } from '../components/EstimatedDelivery';
 import { useAuth } from '../lib/auth/AuthProvider';
 import {
   LayoutGrid,
@@ -146,8 +147,8 @@ export const DropshipperDashboard: React.FC = () => {
         featuredProductIds: selectedFeatured,
       });
       showToast('Storefront customization saved!', 'success');
-    } catch (err: any) {
-      showToast(err?.message || 'Failed to save customization', 'error');
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Failed to save customization', 'error');
     } finally {
       setSavingCustomization(false);
     }
@@ -879,6 +880,7 @@ export const DropshipperDashboard: React.FC = () => {
                       <th className="p-4">Total</th>
                       <th className="p-4">Commission</th>
                       <th className="p-4">Status</th>
+                      <th className="p-4">Estimated Delivery</th>
                       <th className="p-4">Date</th>
                     </tr>
                   </thead>
@@ -904,6 +906,9 @@ export const DropshipperDashboard: React.FC = () => {
                           }`}>
                             {o.status}
                           </span>
+                        </td>
+                        <td className="p-4">
+                          <EstimatedDelivery estimate={o.estimatedDelivery} />
                         </td>
                         <td className="p-4 text-[#999] text-[10px]">
                           {new Date(o.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}

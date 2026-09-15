@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { EstimatedDelivery } from '../components/EstimatedDelivery';
 import { useGlobalStore } from '../store/globalStore';
 import type { Order, SupplierProfile } from '../store/globalStore';
 import {
@@ -385,6 +386,7 @@ export const AdminDashboard: React.FC = () => {
                       <th className="p-4">Total</th>
                       <th className="p-4">Platform Fee</th>
                       <th className="p-4">Status</th>
+                      <th className="p-4">Estimated Delivery</th>
                       <th className="p-4">Date</th>
                     </tr>
                   </thead>
@@ -403,6 +405,9 @@ export const AdminDashboard: React.FC = () => {
                           <span className={`px-2.5 py-1 text-[9px] font-black uppercase tracking-wider rounded ${STATUS_STYLE[o.status]}`}>
                             {o.status}
                           </span>
+                        </td>
+                        <td className="p-4">
+                          <EstimatedDelivery estimate={o.estimatedDelivery} />
                         </td>
                         <td className="p-4 text-[#999] text-[10px]">{formatDate(o.createdAt)}</td>
                       </tr>

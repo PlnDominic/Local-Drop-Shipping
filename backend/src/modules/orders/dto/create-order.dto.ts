@@ -24,6 +24,7 @@ export class CreateOrderDto {
   @IsString() @MinLength(2) customerName: string = '';
   @IsString() customerPhone: string = '';
   @IsString() @MinLength(5) customerAddress: string = '';
+  @IsString() @IsOptional() customerRegion?: string;
   @IsArray() @ValidateNested({ each: true }) @Type(() => OrderItemDto) items: OrderItemDto[] = [];
   @IsOptional() @IsString() notes?: string;
 }

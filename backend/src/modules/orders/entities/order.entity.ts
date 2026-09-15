@@ -26,9 +26,9 @@ export interface OrderEntity {
   subtotal: number;
   platform_fee: number;
   total: number;
+  estimated_delivery: string | null;
   payment_reference: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
-  items?: OrderItemEntity[];
 }

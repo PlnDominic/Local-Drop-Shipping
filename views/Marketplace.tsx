@@ -31,6 +31,8 @@ import type { DropshipperProduct, ProductReview } from '../store/globalStore';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../lib/auth/AuthProvider';
 import { SiteHeader } from '../components/SiteHeader';
+import { EstimatedDelivery } from '../components/EstimatedDelivery';
+import { calculateEstimatedDelivery } from '../lib/delivery';
 
 const heroImage =
   'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=90';
@@ -421,6 +423,9 @@ export const Marketplace: React.FC = () => {
   const [detailProduct, setDetailProduct] = useState<DropshipperProduct | null>(null);
   const [promoInput, setPromoInput] = useState('');
   const [promoError, setPromoError] = useState('');
+  const [estimatedDelivery, setEstimatedDelivery] = useState<string | null>(
+    calculateEstimatedDelivery(new Date(), 'Greater Accra', 'pending').label,
+  );
 
   useEffect(() => {
     const t = setTimeout(() => setIsLoading(false), 1000);
@@ -1128,10 +1133,16 @@ export const Marketplace: React.FC = () => {
 
           <div>
             <h4 className="text-[13px] font-black mb-4 text-gray-200">Support</h4>
-            {['Contact Us', 'Shipping Info', 'Return Policy', 'FAQ', 'Track Order'].map((link) => (
-              <a key={link} href="#" onClick={(e) => e.preventDefault()} className="block text-[12px] text-gray-400 hover:text-white mb-2 transition-colors">
-                {link}
-              </a>
+            {[
+              { label: 'Contact Us', href: '#' },
+              { label: 'Shipping Info', href: '#' },
+              { label: 'Return Policy', href: '#' },
+              { label: 'FAQ', href: '#' },
+              { label: 'Track Order', href: '/track-order' },
+            ].map(({ label, href }) => (
+              <Link key={label} href={href} className="block text-[12px] text-gray-400 hover:text-white mb-2 transition-colors">
+                {label}
+              </Link>
             ))}
           </div>
 
@@ -1330,7 +1341,6 @@ export const Marketplace: React.FC = () => {
               {[
                 { name: 'fullName', label: 'Full name', value: 'Ama Mensah' },
                 { name: 'phone', label: 'Phone', value: '+233244123456' },
-                { name: 'region', label: 'Region', value: 'Greater Accra' },
                 { name: 'city', label: 'City', value: 'Accra' },
                 { name: 'ghanaPostGps', label: 'GhanaPost GPS', value: 'GA-184-9022' },
                 { name: 'momoNumber', label: 'MoMo number', value: '+233244123456' }
@@ -1340,6 +1350,22 @@ export const Marketplace: React.FC = () => {
                   <input name={f.name} defaultValue={f.value} required className="h-11 rounded border border-gray-200 px-4 text-sm text-[#1c1c1c] outline-none focus:border-[#f04438]" />
                 </label>
               ))}
+              <label className="grid gap-1 text-xs font-black text-[#777]">
+                Region
+                <input
+                  name="region"
+                  defaultValue="Greater Accra"
+                  required
+                  onChange={(e) => {
+                    const region = e.target.value;
+                    if (region.trim()) {
+                      const est = calculateEstimatedDelivery(new Date(), region, 'pending');
+                      setEstimatedDelivery(est.label);
+                    }
+                  }}
+                  className="h-11 rounded border border-gray-200 px-4 text-sm text-[#1c1c1c] outline-none focus:border-[#f04438]"
+                />
+              </label>
             </div>
 
             <label className="mt-3 grid gap-1 text-xs font-black text-[#777]">
@@ -1348,6 +1374,7 @@ export const Marketplace: React.FC = () => {
             </label>
 
             <div className="mt-5 rounded bg-gray-50 p-4 space-y-1">
+              <EstimatedDelivery estimate={estimatedDelivery} />
               <div className="flex justify-between text-sm text-[#777]">
                 <span>Subtotal</span><span>{formatMoney(cartSubtotal)}</span>
               </div>

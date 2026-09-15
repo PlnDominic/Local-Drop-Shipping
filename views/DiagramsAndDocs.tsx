@@ -37,7 +37,7 @@ export const DiagramsAndDocs: React.FC = () => {
           role: "customer",
           isVerified: true
         },
-        token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+token: "your-jwt-token-here"
       }, null, 2)
     },
     {
@@ -50,7 +50,7 @@ export const DiagramsAndDocs: React.FC = () => {
         password: "securepassword123"
       }, null, 2),
       response: JSON.stringify({
-        token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        token: "your-jwt-token-here",
         role: "customer"
       }, null, 2)
     },

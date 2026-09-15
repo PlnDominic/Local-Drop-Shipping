@@ -33,6 +33,8 @@ import type { Category } from '../lib/supabase/types';
 import type { DropshipperProduct, DropshipperStoreProfile } from '../lib/api/types';
 import { useToast } from '../components/Toast';
 import { useGlobalStore } from '../store/globalStore';
+import { EstimatedDelivery } from '../components/EstimatedDelivery';
+import { calculateEstimatedDelivery } from '../lib/delivery';
 
 const formatMoney = (amount: number) =>
   `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
@@ -261,6 +263,9 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [estimatedDelivery, setEstimatedDelivery] = useState<string | null>(
+    calculateEstimatedDelivery(new Date(), 'Greater Accra', 'pending').label,
+  );
 
   const [cart, setCart] = useState<CartLine[]>([]);
 
@@ -1147,6 +1152,13 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
                   name="region"
                   required
                   placeholder="e.g. Greater Accra"
+                  onChange={(e) => {
+                    const region = e.target.value;
+                    if (region.trim()) {
+                      const est = calculateEstimatedDelivery(new Date(), region, 'pending');
+                      setEstimatedDelivery(est.label);
+                    }
+                  }}
                   className="h-10 rounded-lg border border-gray-200 px-3 text-xs text-[#1c1c1c] outline-none focus:border-gray-400"
                 />
               </label>
@@ -1190,6 +1202,7 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
             </label>
 
             <div className="mt-4 rounded-lg bg-gray-50 p-4 space-y-1.5 border border-gray-100">
+              <EstimatedDelivery estimate={estimatedDelivery} />
               <div className="flex justify-between text-xs text-[#777]">
                 <span>Items Subtotal</span>
                 <span>{formatMoney(cartSubtotal)}</span>

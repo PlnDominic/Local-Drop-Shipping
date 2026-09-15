@@ -1,5 +1,5 @@
 -- ============================================================================
--- Local Drop Shipping — full Supabase setup (schema + RLS + security functions)
+-- Local Drop Shipping — corrected full Supabase setup (schema + RLS + security functions)
 -- ============================================================================
 -- Idempotent: safe to run multiple times. Run in the Supabase SQL editor.
 -- Assumes Supabase Auth; public.users.id == auth.users.id == auth.uid().
@@ -51,6 +51,7 @@ create table if not exists public.dropshipper_profiles (
   business_name   text not null default '',
   store_name      text,
   store_slug      text unique,
+  is_approved     boolean not null default false,
   description     text,
   logo_url        text,
   location        text,
@@ -58,6 +59,17 @@ create table if not exists public.dropshipper_profiles (
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
+-- Add column for tables created before this migration.
+alter table public.dropshipper_profiles add column if not exists is_approved boolean not null default false;
+
+-- ── Storefront customization columns ──
+alter table public.dropshipper_profiles add column if not exists theme_color text not null default '#f04438';
+alter table public.dropshipper_profiles add column if not exists banner_url text;
+alter table public.dropshipper_profiles add column if not exists tagline text;
+alter table public.dropshipper_profiles add column if not exists announcement text;
+alter table public.dropshipper_profiles add column if not exists whatsapp text;
+alter table public.dropshipper_profiles add column if not exists social_links jsonb not null default '{}';
+alter table public.dropshipper_profiles add column if not exists featured_product_ids uuid[] not null default '{}';
 
 create table if not exists public.products (
   id             uuid primary key default gen_random_uuid(),
@@ -104,6 +116,12 @@ create table if not exists public.orders (
   updated_at        timestamptz not null default now()
 );
 
+-- Checkout / delivery fields. Safe for existing orders tables.
+alter table public.orders add column if not exists customer_region text not null default '';
+alter table public.orders add column if not exists customer_city text not null default '';
+alter table public.orders add column if not exists customer_ghana_post_gps text not null default '';
+alter table public.orders add column if not exists estimated_delivery_date date;
+
 create table if not exists public.order_items (
   id         uuid primary key default gen_random_uuid(),
   order_id   uuid not null references public.orders(id) on delete cascade,
@@ -145,41 +163,145 @@ create table if not exists public.payments (
   updated_at timestamptz not null default now()
 );
 
+-- Per-variant stock/pricing under a product (e.g. size/color combinations).
+create table if not exists public.product_variants (
+  id               uuid primary key default gen_random_uuid(),
+  product_id       uuid not null references public.products(id) on delete cascade,
+  label            text not null,
+  sku_suffix       text not null default '',
+  price_adjustment numeric(12,2) not null default 0,
+  stock_qty        integer not null default 0,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+-- Customer/dropshipper reviews left against a supplier's product.
+create table if not exists public.product_reviews (
+  id          uuid primary key default gen_random_uuid(),
+  product_id  uuid not null references public.products(id) on delete cascade,
+  user_id     uuid references public.users(id) on delete set null,
+  author_name text not null default 'Anonymous',
+  rating      integer not null check (rating between 1 and 5),
+  comment     text not null default '',
+  created_at  timestamptz not null default now(),
+  unique (product_id, user_id)
+);
+
 create index if not exists idx_products_supplier on public.products(supplier_id);
 create index if not exists idx_products_active on public.products(is_active);
 create index if not exists idx_dp_products_pub on public.dropshipper_products(is_published);
 create index if not exists idx_orders_dropshipper on public.orders(dropshipper_id);
+create index if not exists idx_orders_delivery_date on public.orders(estimated_delivery_date);
 create index if not exists idx_wallet_tx_user on public.wallet_transactions(user_id);
+create index if not exists idx_product_variants_product on public.product_variants(product_id);
+create index if not exists idx_product_reviews_product on public.product_reviews(product_id);
 
 -- ── Auth → profile provisioning ─────────────────────────────────────────────
--- On signup, create the public profile row and an empty wallet.
+-- On signup, create the public profile row, an empty wallet, and role-specific
+-- profiles (dropshipper/supplier). For dropshippers a unique store_slug is
+-- auto-generated so /store/[storeSlug] is immediately usable.
+
+-- Generate a unique store_slug from a base name.
+create or replace function public.generate_store_slug(base_name text)
+returns text
+language plpgsql
+set search_path = public
+as $$
+declare
+  base    text;
+  slug    text;
+  counter int := 0;
+begin
+  base := lower(regexp_replace(coalesce(base_name, 'store'), '[^a-zA-Z0-9]+', '-', 'g'));
+  base := trim(both '-' from base);
+  if length(base) < 3 then base := base || '-store'; end if;
+  slug := base;
+  loop
+    if not exists (select 1 from public.dropshipper_profiles where store_slug = slug) then
+      return slug;
+    end if;
+    counter := counter + 1;
+    slug := base || '-' || counter;
+  end loop;
+end;
+$$;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_role  text := coalesce(new.raw_user_meta_data->>'role', 'customer');
+  v_name  text := coalesce(new.raw_user_meta_data->>'full_name', '');
+  v_phone text := coalesce(new.raw_user_meta_data->>'phone', '');
+  v_slug  text;
 begin
-  insert into public.users (id, full_name, email, phone, role, is_verified)
+  if v_role not in ('customer', 'dropshipper', 'supplier', 'admin') then
+    v_role := 'customer';
+  end if;
+
+  insert into public.users (
+    id, full_name, email, phone, role, is_verified
+  )
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'full_name', ''),
-    new.email,
-    coalesce(new.raw_user_meta_data->>'phone', ''),
-    coalesce(new.raw_user_meta_data->>'role', 'customer'),
+    v_name,
+    coalesce(new.email, ''),
+    v_phone,
+    v_role,
     false
   )
-  on conflict (id) do nothing;
+  on conflict (id) do update
+    set full_name = excluded.full_name,
+        email = excluded.email,
+        phone = excluded.phone,
+        role = excluded.role,
+        updated_at = now();
 
-  insert into public.wallets (user_id) values (new.id) on conflict (user_id) do nothing;
+  insert into public.wallets (user_id)
+  values (new.id)
+  on conflict (user_id) do nothing;
+
+  if v_role = 'dropshipper' then
+    v_slug := public.generate_store_slug(v_name);
+
+    insert into public.dropshipper_profiles (
+      id, business_name, store_name, store_slug, is_approved
+    )
+    values (
+      new.id,
+      case when v_name = '' then 'My Store' else v_name || ' Store' end,
+      case when v_name = '' then 'My Store' else v_name || ' Store' end,
+      v_slug,
+      false
+    )
+    on conflict (id) do nothing;
+  end if;
+
+  if v_role = 'supplier' then
+    insert into public.supplier_profiles (
+      id, business_name, is_approved
+    )
+    values (
+      new.id,
+      v_name,
+      false
+    )
+    on conflict (id) do nothing;
+  end if;
+
   return new;
 end;
 $$;
 
 drop trigger if exists on_auth_user_created on auth.users;
+
 create trigger on_auth_user_created
   after insert on auth.users
-  for each row execute function public.handle_new_user();
+  for each row
+  execute function public.handle_new_user();
 
 -- ── Helper: current user's role ─────────────────────────────────────────────
 create or replace function public.app_user_role()
@@ -203,6 +325,8 @@ alter table public.orders               enable row level security;
 alter table public.order_items          enable row level security;
 alter table public.wallets              enable row level security;
 alter table public.wallet_transactions  enable row level security;
+alter table public.product_variants     enable row level security;
+alter table public.product_reviews      enable row level security;
 
 -- ── Read policies ───────────────────────────────────────────────────────────
 drop policy if exists "categories are public" on public.categories;
@@ -211,6 +335,12 @@ create policy "categories are public" on public.categories for select using (tru
 drop policy if exists "active products are public" on public.products;
 create policy "active products are public" on public.products for select
   using (is_active = true or supplier_id = auth.uid());
+
+drop policy if exists "variants are public" on public.product_variants;
+create policy "variants are public" on public.product_variants for select using (true);
+
+drop policy if exists "reviews are public" on public.product_reviews;
+create policy "reviews are public" on public.product_reviews for select using (true);
 
 drop policy if exists "published store items are public" on public.dropshipper_products;
 create policy "published store items are public" on public.dropshipper_products for select
@@ -266,6 +396,33 @@ create policy "supplier manages own products" on public.products for all
 drop policy if exists "dropshipper manages own store items" on public.dropshipper_products;
 create policy "dropshipper manages own store items" on public.dropshipper_products for all
   using (dropshipper_id = auth.uid()) with check (dropshipper_id = auth.uid());
+
+drop policy if exists "supplier manages own product variants" on public.product_variants;
+create policy "supplier manages own product variants" on public.product_variants for all
+  using (
+    exists (
+      select 1 from public.products p
+      where p.id = product_variants.product_id and p.supplier_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.products p
+      where p.id = product_variants.product_id and p.supplier_id = auth.uid()
+    )
+  );
+
+drop policy if exists "authenticated users write own review" on public.product_reviews;
+create policy "authenticated users write own review" on public.product_reviews for insert
+  with check (user_id = auth.uid());
+
+drop policy if exists "users manage own review" on public.product_reviews;
+create policy "users manage own review" on public.product_reviews for update
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "users delete own review" on public.product_reviews;
+create policy "users delete own review" on public.product_reviews for delete
+  using (user_id = auth.uid());
 
 -- NOTE: orders, wallets and wallet_transactions are intentionally NOT directly
 -- writable by clients. Sensitive writes go through the SECURITY DEFINER
@@ -424,253 +581,28 @@ $$;
 revoke all on function public.wallet_credit(uuid, numeric, text, text) from anon, authenticated;
 grant execute on function public.create_order(uuid, text, text, text, jsonb, text, numeric) to authenticated;
 grant execute on function public.wallet_withdraw(numeric, jsonb) to authenticated;
+grant execute on function public.generate_store_slug(text) to authenticated;
+grant execute on function public.handle_new_user() to service_role;
 
 -- ============================================================================
--- Orders: structured delivery fields, order numbers, supplier visibility,
--- and a status-transition function that credits the dropshipper's commission
--- and each contributing supplier's payout once an order ships.
+-- Seed data (idempotent — safe to re-run)
 -- ============================================================================
 
-alter table public.orders
-  add column if not exists customer_region text,
-  add column if not exists customer_city text,
-  add column if not exists customer_ghana_post_gps text,
-  add column if not exists order_number text unique;
-
--- ── Suppliers can see orders/items containing their own products ───────────
-drop policy if exists "supplier reads orders with their products" on public.orders;
-create policy "supplier reads orders with their products" on public.orders for select
-  using (
-    exists (
-      select 1 from public.order_items oi
-      join public.products p on p.id = oi.product_id
-      where oi.order_id = orders.id and p.supplier_id = auth.uid()
-    )
-  );
-
-drop policy if exists "supplier reads own order items" on public.order_items;
-create policy "supplier reads own order items" on public.order_items for select
-  using (
-    exists (
-      select 1 from public.products p
-      where p.id = order_items.product_id and p.supplier_id = auth.uid()
-    )
-  );
-
--- ── create_order: superseded signature adds structured delivery fields and
---    a short human-readable order number. ──────────────────────────────────
-drop function if exists public.create_order(uuid, text, text, text, jsonb, text, numeric);
-
-create or replace function public.create_order(
-  p_dropshipper_id          uuid,
-  p_customer_name           text,
-  p_customer_phone          text,
-  p_customer_region         text,
-  p_customer_city           text,
-  p_customer_ghana_post_gps text,
-  p_items                   jsonb,
-  p_notes                   text default null,
-  p_platform_fee_percent    numeric default 2
-)
-returns public.orders
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_order      public.orders;
-  v_item       jsonb;
-  v_product_id uuid;
-  v_qty        int;
-  v_price      numeric;
-  v_subtotal   numeric := 0;
-  v_fee        numeric;
-begin
-  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
-    raise exception 'Order must contain at least one item';
-  end if;
-
-  for v_item in select * from jsonb_array_elements(p_items) loop
-    v_product_id := (v_item->>'productId')::uuid;
-    v_qty        := (v_item->>'quantity')::int;
-    if v_qty is null or v_qty < 1 then
-      raise exception 'Invalid quantity for product %', v_product_id;
-    end if;
-
-    select custom_price into v_price
-    from public.dropshipper_products
-    where dropshipper_id = p_dropshipper_id and product_id = v_product_id;
-
-    if v_price is null or v_price <= 0 then
-      raise exception 'Product % is not available in this store', v_product_id;
-    end if;
-
-    v_subtotal := v_subtotal + (v_price * v_qty);
-  end loop;
-
-  v_fee := round(v_subtotal * p_platform_fee_percent / 100, 2);
-
-  insert into public.orders (
-    dropshipper_id, customer_name, customer_phone,
-    customer_region, customer_city, customer_ghana_post_gps,
-    status, subtotal, platform_fee, total, notes, order_number
-  ) values (
-    p_dropshipper_id, p_customer_name, p_customer_phone,
-    p_customer_region, p_customer_city, p_customer_ghana_post_gps,
-    'pending', v_subtotal, v_fee, v_subtotal + v_fee, p_notes,
-    'LDK-' || lpad((floor(random() * 900000) + 100000)::text, 6, '0')
-  )
-  returning * into v_order;
-
-  for v_item in select * from jsonb_array_elements(p_items) loop
-    v_product_id := (v_item->>'productId')::uuid;
-    v_qty        := (v_item->>'quantity')::int;
-    select custom_price into v_price
-    from public.dropshipper_products
-    where dropshipper_id = p_dropshipper_id and product_id = v_product_id;
-
-    insert into public.order_items (order_id, product_id, quantity, unit_price, subtotal)
-    values (v_order.id, v_product_id, v_qty, v_price, round(v_price * v_qty, 2));
-  end loop;
-
-  return v_order;
-end;
-$$;
-
-grant execute on function public.create_order(uuid, text, text, text, text, text, jsonb, text, numeric) to authenticated;
-
--- ── update_order_status: the order's dropshipper, a supplier with items in
---    it, or an admin can advance its status. Crediting the dropshipper's
---    commission and each supplier's payout happens exactly once, on the
---    first transition into 'shipped'. ───────────────────────────────────────
-create or replace function public.update_order_status(
-  p_order_id uuid,
-  p_status   text
-)
-returns public.orders
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_uid            uuid := auth.uid();
-  v_before         public.orders;
-  v_order          public.orders;
-  v_is_participant boolean;
-  v_commission     numeric;
-  v_payout_row     record;
-begin
-  if v_uid is null then
-    raise exception 'Not authenticated';
-  end if;
-  if p_status not in ('confirmed','processing','shipped','delivered','cancelled','refunded') then
-    raise exception 'Invalid status %', p_status;
-  end if;
-
-  select * into v_before from public.orders where id = p_order_id;
-  if v_before is null then
-    raise exception 'Order not found';
-  end if;
-
-  select
-    v_before.dropshipper_id = v_uid
-    or public.app_user_role() = 'admin'
-    or exists (
-      select 1 from public.order_items oi
-      join public.products p on p.id = oi.product_id
-      where oi.order_id = v_before.id and p.supplier_id = v_uid
-    )
-  into v_is_participant;
-
-  if not v_is_participant then
-    raise exception 'Not authorized to update this order';
-  end if;
-
-  update public.orders
-  set status = p_status, updated_at = now()
-  where id = p_order_id
-  returning * into v_order;
-
-  if p_status = 'shipped' and v_before.status is distinct from 'shipped' then
-    select coalesce(sum((oi.unit_price - p.cost_price) * oi.quantity), 0)
-    into v_commission
-    from public.order_items oi
-    join public.products p on p.id = oi.product_id
-    where oi.order_id = v_order.id;
-
-    if v_commission > 0 then
-      perform public.wallet_credit(
-        v_order.dropshipper_id, v_commission,
-        'Commission for order ' || coalesce(v_order.order_number, left(v_order.id::text, 8)),
-        'commission'
-      );
-    end if;
-
-    for v_payout_row in
-      select p.supplier_id as supplier_id, sum(p.cost_price * oi.quantity) as payout
-      from public.order_items oi
-      join public.products p on p.id = oi.product_id
-      where oi.order_id = v_order.id
-      group by p.supplier_id
-    loop
-      if v_payout_row.payout > 0 then
-        perform public.wallet_credit(
-          v_payout_row.supplier_id, v_payout_row.payout,
-          'Payout for order ' || coalesce(v_order.order_number, left(v_order.id::text, 8)),
-          'credit'
-        );
-      end if;
-    end loop;
-  end if;
-
-  return v_order;
-end;
-$$;
-
-grant execute on function public.update_order_status(uuid, text) to authenticated;
-
--- ============================================================================
--- Storage: public bucket for storefront assets (hero banners, logos).
--- Files are keyed as "<user_id>/<filename>" so the RLS policies below can
--- scope writes to the owning user by matching the first path segment.
--- ============================================================================
-
-insert into storage.buckets (id, name, public)
-values ('storefront-assets', 'storefront-assets', true)
-on conflict (id) do nothing;
-
-drop policy if exists "storefront assets are publicly readable" on storage.objects;
-create policy "storefront assets are publicly readable" on storage.objects for select
-  using (bucket_id = 'storefront-assets');
-
-drop policy if exists "owner uploads own storefront assets" on storage.objects;
-create policy "owner uploads own storefront assets" on storage.objects for insert
-  with check (bucket_id = 'storefront-assets' and (storage.foldername(name))[1] = auth.uid()::text);
-
-drop policy if exists "owner updates own storefront assets" on storage.objects;
-create policy "owner updates own storefront assets" on storage.objects for update
-  using (bucket_id = 'storefront-assets' and (storage.foldername(name))[1] = auth.uid()::text);
-
-drop policy if exists "owner deletes own storefront assets" on storage.objects;
-create policy "owner deletes own storefront assets" on storage.objects for delete
-  using (bucket_id = 'storefront-assets' and (storage.foldername(name))[1] = auth.uid()::text);
-
--- ============================================================================
--- Admin oversight: the existing owner-only policies never granted the admin
--- role any access to supplier approvals or platform-wide financials. Without
--- these, the admin dashboard's Approve button, wallet totals, and commission
--- feed all fail silently under RLS no matter what the app code does.
--- ============================================================================
-
-drop policy if exists "admin manages supplier profiles" on public.supplier_profiles;
-create policy "admin manages supplier profiles" on public.supplier_profiles for all
-  using (public.app_user_role() = 'admin')
-  with check (public.app_user_role() = 'admin');
-
-drop policy if exists "admin reads all wallets" on public.wallets;
-create policy "admin reads all wallets" on public.wallets for select
-  using (public.app_user_role() = 'admin');
-
-drop policy if exists "admin reads all wallet transactions" on public.wallet_transactions;
-create policy "admin reads all wallet transactions" on public.wallet_transactions for select
-  using (public.app_user_role() = 'admin');
+-- ── Categories ──
+insert into public.categories (id, name, slug, icon) values
+  ('a1111111-1111-1111-1111-111111111111', 'Electronics', 'electronics', 'Zap'),
+  ('a2222222-2222-2222-2222-222222222222', 'Fashion', 'fashion', 'Heart'),
+  ('a3333333-3333-3333-3333-333333333333', 'Home & Living', 'home', 'Package'),
+  ('a4444444-4444-4444-4444-444444444444', 'Health', 'health', 'Gift')
+on conflict (slug) do nothing;-- NOTE:
+-- Demo supplier/dropshipper users are intentionally NOT inserted here.
+-- public.users.id references auth.users(id), so users must first be created
+-- through Supabase Auth. The handle_new_user() trigger then provisions the
+-- public profile, wallet, and role-specific profile automatically.
+--
+-- Verification helpers:
+-- select id, email, full_name, role from public.users order by created_at desc;
+-- select id, business_name, store_name, store_slug, is_approved
+-- from public.dropshipper_profiles order by created_at desc;
+-- select id, business_name, is_approved
+-- from public.supplier_profiles order by created_at desc;

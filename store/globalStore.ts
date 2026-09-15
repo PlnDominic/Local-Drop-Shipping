@@ -129,6 +129,7 @@ export interface Order {
     ghanaPostGps: string;
   };
   items: OrderItem[];
+  estimatedDelivery?: string | null;
   notes?: string;
   createdAt: string;
 }
@@ -415,6 +416,7 @@ interface OrderDbRow {
   status: Order['status'];
   total: number;
   platform_fee: number;
+  estimated_delivery: string | null;
   notes: string | null;
   created_at: string;
   dropshipper_profiles?: { store_name: string | null } | null;
@@ -445,6 +447,7 @@ function mapOrderRow(row: OrderDbRow): Order {
     platformFee: Number(row.platform_fee ?? 0),
     profitAmount,
     costAmount,
+    estimatedDelivery: row.estimated_delivery ?? undefined,
     deliveryAddress: {
       fullName: row.customer_name,
       phone: row.customer_phone,
@@ -1087,9 +1090,9 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       p_dropshipper_id: payload.dropshipperId,
       p_customer_name: payload.fullName,
       p_customer_phone: payload.phone,
-      p_customer_region: payload.region,
       p_customer_city: payload.city,
       p_customer_ghana_post_gps: payload.ghanaPostGps,
+      p_customer_region: payload.region,
       p_items: payload.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
       p_notes: payload.notes || null,
     });
@@ -1125,9 +1128,9 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         p_dropshipper_id: dropshipperId,
         p_customer_name: checkoutData.fullName,
         p_customer_phone: checkoutData.phone,
-        p_customer_region: checkoutData.region,
         p_customer_city: checkoutData.city,
         p_customer_ghana_post_gps: checkoutData.ghanaPostGps,
+        p_customer_region: checkoutData.region,
         p_items: items,
         p_notes: checkoutData.notes || null,
       });

@@ -217,6 +217,7 @@ export interface Order {
   costAmount: number;
   deliveryAddress: DeliveryAddress;
   items: OrderItem[];
+  estimatedDelivery?: string | null;
   notes?: string;
   createdAt: string;
 }

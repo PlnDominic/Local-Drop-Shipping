@@ -9,6 +9,7 @@ import { JwtPayload } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus } from './entities/order.entity';
+import { calculateEstimatedDelivery } from './delivery-estimate';
 
 @Injectable()
 export class OrdersService {
@@ -65,6 +66,15 @@ export class OrdersService {
     const platformFee = parseFloat(((subtotal * this.platformFeePercent) / 100).toFixed(2));
     const total = parseFloat((subtotal + platformFee).toFixed(2));
 
+    // Calculate estimated delivery date based on order date and customer region.
+    // Use the explicit region if provided, otherwise fall back to the address.
+    const regionForCalc = dto.customerRegion || dto.customerAddress || '';
+    const estimatedDelivery = this.resolveEstimatedDelivery(
+      regionForCalc,
+      new Date().toISOString(),
+      'pending',
+    );
+
     const { data: order, error: orderErr } = await this.supabase.db
       .from('orders')
       .insert({
@@ -76,6 +86,7 @@ export class OrdersService {
         subtotal,
         platform_fee: platformFee,
         total,
+        estimated_delivery: estimatedDelivery,
         notes: dto.notes ?? null,
       })
       .select()
@@ -138,7 +149,46 @@ export class OrdersService {
       .single();
 
     if (error || !data) throw new NotFoundException(`Order ${id} not found.`);
+
+    // Recalculate estimated delivery when transitioning to a shipping-related status.
+    if (status === 'shipped' || status === 'processing' || status === 'confirmed') {
+      await this.recalculateEstimatedDelivery(id, data.dropshipper_id);
+    }
+
     return data;
+  }
+
+  /** Calculates or resolves the estimated delivery date string. */
+  private resolveEstimatedDelivery(address: string, orderDate: string, status: string): string | null {
+    if (!address) return null;
+    const region = address.toLowerCase();
+    const delivery = calculateEstimatedDelivery(orderDate, region, status);
+    return delivery.label;
+  }
+
+  /** Recalculates estimated delivery based on the new order status. */
+  async recalculateEstimatedDelivery(id: string, dropshipperId: string): Promise<void> {
+    const { data: order, error: findErr } = await this.supabase.db
+      .from('orders')
+      .select('status, customer_address, created_at')
+      .eq('id', id)
+      .eq('dropshipper_id', dropshipperId)
+      .single();
+
+    if (findErr || !order) return;
+
+    const estimatedDelivery = this.resolveEstimatedDelivery(
+      order.customer_address ?? '',
+      order.created_at ?? new Date().toISOString(),
+      order.status,
+    );
+
+    if (estimatedDelivery) {
+      await this.supabase.db
+        .from('orders')
+        .update({ estimated_delivery: estimatedDelivery })
+        .eq('id', id);
+    }
   }
 
   /** Ensures the order contains at least one product belonging to this supplier. */
