@@ -29,8 +29,8 @@ export interface AutocompleteResponse {
 
 export const ghanaPostApi = {
   validate: (gpsAddress: string): Promise<GhanaPostValidationResult> =>
-    api.post<GhanaPostValidationResult>('/ghana-post/validate', { gps_address: gpsAddress }),
+    api.post<GhanaPostValidationResult>('/v1/ghana-post/validate', { gps_address: gpsAddress }),
 
   autocomplete: (query: string): Promise<GhanaPostSuggestion[]> =>
-    api.get<AutocompleteResponse>(`/ghana-post/autocomplete?q=${encodeURIComponent(query)}`).then((res) => res.data ?? []),
+    api.get<AutocompleteResponse>(`/v1/ghana-post/autocomplete?q=${encodeURIComponent(query)}`).then((res) => res.data ?? []),
 };

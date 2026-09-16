@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { XMLParser } from 'fast-xml-parser';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 
 export interface GhanaPostValidationResult {
@@ -23,17 +24,39 @@ export interface GhanaPostSuggestion {
 @Injectable()
 export class GhanaPostService {
   private readonly logger = new Logger(GhanaPostService.name);
-  private readonly apiKey: string | undefined;
+  private readonly apiAuthorization: string | undefined;
+  private readonly asaaseUser: string | undefined;
+  private readonly languageCode: string | undefined;
+  private readonly deviceId: string | undefined;
+  private readonly androidCert: string | undefined;
+  private readonly androidPackage: string | undefined;
+  private readonly countryName: string | undefined;
+  private readonly country: string | undefined;
+  private readonly apiUrl: string | undefined;
+  private readonly xmlParser: XMLParser;
 
   constructor(
     private readonly config: ConfigService,
     private readonly supabase: SupabaseService,
   ) {
-    this.apiKey = this.config.get<string>('app.ghanaPostApiKey');
+    this.apiAuthorization = this.config.get<string>('gpgpsAuthorization');
+    this.asaaseUser = this.config.get<string>('gpgpsAsaaseUser');
+    this.languageCode = this.config.get<string>('gpgpsLanguageCode') ?? 'en';
+    this.deviceId = this.config.get<string>('gpgpsDeviceId');
+    this.androidCert = this.config.get<string>('gpgpsAndroidCert');
+    this.androidPackage = this.config.get<string>('gpgpsAndroidPackage');
+    this.countryName = this.config.get<string>('gpgpsCountryName');
+    this.country = this.config.get<string>('gpgpsCountry');
+    this.apiUrl = this.config.get<string>('gpgpsApiURL');
+    this.xmlParser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '',
+      parseAttributeValue: true,
+    });
   }
 
-  private getGhanaPostBaseUrl(): string {
-    return this.config.get<string>('app.ghanaPostBaseUrl') ?? 'https://api.ghanapostgps.com';
+  private getBaseApiUrl(): string {
+    return this.apiUrl ?? 'https://api.ghanapostgps.com/v2/PublicGPGPSAPI.aspx';
   }
 
   async validateAddress(gpsAddress: string): Promise<GhanaPostValidationResult> {
@@ -51,7 +74,8 @@ export class GhanaPostService {
       };
     }
 
-    if (!this.apiKey) {
+    // If we don't have credentials, use fallback
+    if (!this.apiAuthorization || !this.asaaseUser) {
       return this.fallbackValidation(normalized);
     }
 
@@ -69,7 +93,8 @@ export class GhanaPostService {
       return [];
     }
 
-    if (!this.apiKey) {
+    // If we don't have credentials, use fallback
+    if (!this.apiAuthorization || !this.asaaseUser) {
       return this.fallbackAutocomplete(trimmed);
     }
 
@@ -90,52 +115,118 @@ export class GhanaPostService {
   }
 
   private async apiValidation(address: string): Promise<GhanaPostValidationResult> {
-    const response = await fetch(`${this.getGhanaPostBaseUrl}/verify`, {
+    // Build request data for the GhanaPost API
+    const requestData = new URLSearchParams();
+    requestData.append('Action', 'ValidateGPS');
+    requestData.append('GPSAddress', address);
+    requestData.append('Authorization', this.apiAuthorization!);
+    requestData.append('AsaaseUser', this.asaaseUser!);
+    requestData.append('LanguageCode', this.languageCode!);
+    requestData.append('DeviceID', this.deviceId!);
+    requestData.append('AndroidCert', this.androidCert!);
+    requestData.append('AndroidPackage', this.androidPackage!);
+    requestData.append('CountryName', this.countryName!);
+    requestData.append('Country', this.country!);
+
+    const response = await fetch(this.getBaseApiUrl(), {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: JSON.stringify({ gps_address: address }),
+      body: requestData.toString(),
     });
 
     if (!response.ok) {
       throw new Error(`GhanaPost API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.text();
+
+    // Parse the XML response (GhanaPost returns XML)
+    const parsed = this.xmlParser.parse(data);
+
+    // Extract values from parsed XML
+    const valid = parsed?.Valid === 'True';
+    const message = parsed?.Message;
+    const region = parsed?.Region ?? null;
+    const city = parsed?.City ?? null;
+    const street = parsed?.Street ?? null;
 
     return {
-      valid: data.valid === true,
+      valid,
       gpsAddress: address,
-      region: data.region ?? null,
-      city: data.city ?? null,
-      street: data.street ?? null,
-      confidence: data.confidence ?? (data.valid ? 95 : 0),
-      message: data.message ?? undefined,
+      region,
+      city,
+      street,
+      confidence: valid ? 95 : 0,
+      message: message ?? undefined,
     };
   }
 
   private async apiAutocomplete(query: string): Promise<GhanaPostSuggestion[]> {
-    const response = await fetch(`${this.getGhanaPostBaseUrl}/autocomplete?q=${encodeURIComponent(query)}`, {
+    // Build request data for autocomplete
+    const requestData = new URLSearchParams();
+    requestData.append('Action', 'SuggestGPS');
+    requestData.append('SearchText', query);
+    requestData.append('Authorization', this.apiAuthorization!);
+    requestData.append('AsaaseUser', this.asaaseUser!);
+    requestData.append('LanguageCode', this.languageCode!);
+    requestData.append('DeviceID', this.deviceId!);
+    requestData.append('AndroidCert', this.androidCert!);
+    requestData.append('AndroidPackage', this.androidPackage!);
+    requestData.append('CountryName', this.countryName!);
+    requestData.append('Country', this.country!);
+
+    const response = await fetch(this.getBaseApiUrl(), {
+      method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
+      body: requestData.toString(),
     });
 
     if (!response.ok) {
       throw new Error(`GhanaPost API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.text();
 
-    return (data.suggestions ?? []).map((s: Record<string, unknown>): GhanaPostSuggestion => ({
-      gpsAddress: String(s.gps_address ?? s.address ?? ''),
-      region: (s.region as string) ?? null,
-      city: (s.city as string) ?? null,
-      street: (s.street as string) ?? null,
-      description: String(s.description ?? s.address ?? ''),
-    }));
+    // Parse XML response
+    const parsed = this.xmlParser.parse(data);
+
+    // Extract suggestions
+    const suggestions: GhanaPostSuggestion[] = [];
+    const suggestionElements = parsed?.Suggestion;
+
+    if (Array.isArray(suggestionElements)) {
+      for (const suggestion of suggestionElements) {
+        const gpsAddress = suggestion.GPSAddress ?? '';
+        const region = suggestion.Region ?? null;
+        const city = suggestion.City ?? null;
+        const street = suggestion.Street ?? null;
+        const description = suggestion.Description ?? gpsAddress;
+
+        suggestions.push({
+          gpsAddress,
+          region,
+          city,
+          street,
+          description,
+        });
+      }
+    } else if (suggestionElements) {
+      // Single suggestion
+      const suggestion = suggestionElements;
+      suggestions.push({
+        gpsAddress: suggestion.GPSAddress ?? '',
+        region: suggestion.Region ?? null,
+        city: suggestion.City ?? null,
+        street: suggestion.Street ?? null,
+        description: suggestion.Description ?? suggestion.GPSAddress ?? '',
+      });
+    }
+
+    return suggestions;
   }
 
   private fallbackValidation(address: string): GhanaPostValidationResult {
