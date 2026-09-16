@@ -569,6 +569,7 @@ export const Marketplace: React.FC = () => {
     const result = await submitCheckout({
       fullName: String(form.get('fullName') || ''),
       phone: String(form.get('phone') || ''),
+      address: String(form.get('address') || ''),
       region: String(form.get('region') || ''),
       city: String(form.get('city') || ''),
       ghanaPostGps: String(form.get('ghanaPostGps') || ''),
@@ -1341,6 +1342,7 @@ export const Marketplace: React.FC = () => {
               {[
                 { name: 'fullName', label: 'Full name', value: 'Ama Mensah' },
                 { name: 'phone', label: 'Phone', value: '+233244123456' },
+                { name: 'address', label: 'Delivery Address', value: '' },
                 { name: 'city', label: 'City', value: 'Accra' },
                 { name: 'ghanaPostGps', label: 'GhanaPost GPS', value: 'GA-184-9022' },
                 { name: 'momoNumber', label: 'MoMo number', value: '+233244123456' }

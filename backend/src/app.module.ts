@@ -17,6 +17,7 @@ import { DroppshippersModule } from './modules/dropshippers/dropshippers.module'
 import { WalletModule } from './modules/wallet/wallet.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { GhanaPostModule } from './modules/ghana-post/ghana-post.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     ProductsModule,
     CategoriesModule,
     OrdersModule,
+    GhanaPostModule,
     PaymentsModule,
     SuppliersModule,
     DroppshippersModule,

@@ -31,8 +31,10 @@ import {
 } from '../lib/supabase/queries';
 import type { Category } from '../lib/supabase/types';
 import type { DropshipperProduct, DropshipperStoreProfile } from '../lib/api/types';
+import type { GhanaPostValidationResult } from '../lib/api/ghana-post';
 import { useToast } from '../components/Toast';
 import { useGlobalStore } from '../store/globalStore';
+import { GhanaPostAddressInput } from '../components/GhanaPostAddressInput';
 import { EstimatedDelivery } from '../components/EstimatedDelivery';
 import { calculateEstimatedDelivery } from '../lib/delivery';
 
@@ -250,6 +252,7 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ghanaPostGps, setGhanaPostGps] = useState<string>('');
 
   // Announcement dismissal
   const [announcementDismissed, setAnnouncementDismissed] = useState(false);
@@ -266,6 +269,7 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
   const [estimatedDelivery, setEstimatedDelivery] = useState<string | null>(
     calculateEstimatedDelivery(new Date(), 'Greater Accra', 'pending').label,
   );
+  const [gpsValidation, setGpsValidation] = useState<GhanaPostValidationResult | null>(null);
 
   const [cart, setCart] = useState<CartLine[]>([]);
 
@@ -296,58 +300,7 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
         const productsRes = await getPublishedDropshipperProducts(storeRes.id);
         if (active) {
           if (productsRes.length === 0) {
-            setProducts([
-              {
-                id: 'seed-dp-1',
-                dropshipperId: storeRes.id,
-                productId: 'seed-product-1',
-                product: {
-                  id: 'seed-product-1',
-                  supplierId: 'seed-supplier-1',
-                  supplierName: 'Bhra Joe Store',
-                  categoryId: 'cat-1',
-                  categorySlug: 'electronics',
-                  name: 'Samsung Galaxy S24 Ultra 256GB',
-                  description: 'Latest Samsung Galaxy S24 Ultra with 256GB storage, titanium design, and advanced camera system. Black, brand new, sealed.',
-                  images: ['https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?auto=format&fit=crop&w=800&q=90'],
-                  costPrice: 850,
-                  suggestedPrice: 1200,
-                  stockQty: 15,
-                  sku: 'SGS24U-256-BLK',
-                  isActive: true,
-                  createdAt: new Date().toISOString(),
-                },
-                sellingPrice: 1099,
-                customDescription: 'Express delivery within 24 hours. Pay via MTN MoMo on delivery.',
-                isPublished: true,
-                createdAt: new Date().toISOString(),
-              },
-              {
-                id: 'seed-dp-2',
-                dropshipperId: storeRes.id,
-                productId: 'seed-product-2',
-                product: {
-                  id: 'seed-product-2',
-                  supplierId: 'seed-supplier-1',
-                  supplierName: 'Bhra Joe Store',
-                  categoryId: 'cat-2',
-                  categorySlug: 'fashion',
-                  name: "Women's Ankara Wrap Dress",
-                  description: 'Beautiful Ankara print wrap dress for women. Vibrant colors, comfortable fit. Perfect for special occasions.',
-                  images: ['https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=800&q=90'],
-                  costPrice: 120,
-                  suggestedPrice: 280,
-                  stockQty: 20,
-                  sku: 'AADRESS-M',
-                  isActive: true,
-                  createdAt: new Date().toISOString(),
-                },
-                sellingPrice: 249,
-                customDescription: 'Free delivery within Accra. Pay via MTN MoMo on delivery.',
-                isPublished: true,
-                createdAt: new Date().toISOString(),
-              },
-            ]);
+            setProducts([]);
           } else {
             setProducts(productsRes);
           }
@@ -435,6 +388,19 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
     }
 
     setCheckoutError('');
+
+    if (!ghanaPostGps) {
+      setCheckoutError('Please enter your GhanaPost GPS address.');
+      showToast('Please enter your GhanaPost GPS address.', 'error');
+      return;
+    }
+
+    if (gpsValidation && !gpsValidation.data.valid) {
+      setCheckoutError('Please correct your GhanaPost GPS address before continuing.');
+      showToast('Invalid GhanaPost GPS address. Please correct it.', 'error');
+      return;
+    }
+
     setCheckoutSubmitting(true);
     const form = new FormData(event.currentTarget);
     const result = await submitOrder({
@@ -442,9 +408,10 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
       items: cartLines.map((l) => ({ productId: l.item.productId, quantity: l.quantity })),
       fullName: String(form.get('fullName') || ''),
       phone: String(form.get('phone') || ''),
+      address: String(form.get('address') || ''),
       region: String(form.get('region') || ''),
       city: String(form.get('city') || ''),
-      ghanaPostGps: String(form.get('ghanaPostGps') || ''),
+      ghanaPostGps: ghanaPostGps,
       notes: String(form.get('notes') || ''),
     });
     setCheckoutSubmitting(false);
@@ -1162,25 +1129,40 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
                   className="h-10 rounded-lg border border-gray-200 px-3 text-xs text-[#1c1c1c] outline-none focus:border-gray-400"
                 />
               </label>
-              <label className="grid gap-1 text-[11px] font-black text-[#666]">
-                City / Town
-                <input
-                  name="city"
-                  required
-                  placeholder="e.g. Madina"
-                  className="h-10 rounded-lg border border-gray-200 px-3 text-xs text-[#1c1c1c] outline-none focus:border-gray-400"
-                />
-              </label>
-              <label className="grid gap-1 text-[11px] font-black text-[#666]">
-                GhanaPost GPS Address
-                <input
-                  name="ghanaPostGps"
-                  required
-                  placeholder="GA-184-9022"
-                  className="h-10 rounded-lg border border-gray-200 px-3 text-xs text-[#1c1c1c] outline-none focus:border-gray-400"
-                />
-              </label>
-              <label className="grid gap-1 text-[11px] font-black text-[#666]">
+<label className="grid gap-1 text-[11px] font-black text-[#666]">
+                  City / Town
+                  <input
+                    name="city"
+                    required
+                    placeholder="e.g. Madina"
+                    className="h-10 rounded-lg border border-gray-200 px-3 text-xs text-[#1c1c1c] outline-none focus:border-gray-400"
+                  />
+                </label>
+                <label className="grid gap-1 text-[11px] font-black text-[#666] sm:col-span-2">
+                  Delivery Address
+                  <input
+                    name="address"
+                    required
+                    placeholder="e.g. Near the Shell station, blue gate"
+                    className="h-10 rounded-lg border border-gray-200 px-3 text-xs text-[#1c1c1c] outline-none focus:border-gray-400"
+                  />
+                </label>
+                <label className="grid gap-1 text-[11px] font-black text-[#666]">
+                  GhanaPost GPS Address
+                 <GhanaPostAddressInput
+                   value={ghanaPostGps}
+                   onChange={(value) => {
+                     setGhanaPostGps(value);
+                   }}
+                   onValidationChange={(result) => {
+                     setGpsValidation(result);
+                   }}
+                   disabled={checkoutSubmitting}
+                   placeholder="GA-184-9022"
+                   className="w-full"
+                 />
+               </label>
+               <label className="grid gap-1 text-[11px] font-black text-[#666]">
                 MTN MoMo / Telecel Number
                 <input
                   name="momoNumber"

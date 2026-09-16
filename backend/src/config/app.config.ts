@@ -15,5 +15,6 @@ export default registerAs('app', () => ({
   whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
   momoSubscriptionKey: process.env.MOMO_SUBSCRIPTION_KEY,
   ghanaPostApiKey: process.env.GHANAPOST_API_KEY,
+  ghanaPostBaseUrl: process.env.GHANAPOST_BASE_URL,
   platformFeePercent: parseFloat(process.env.PLATFORM_FEE_PERCENT || '2'),
 }));

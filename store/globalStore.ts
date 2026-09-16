@@ -246,6 +246,7 @@ interface AppState {
     items: Array<{ productId: string; quantity: number }>;
     fullName: string;
     phone: string;
+    address: string;
     region: string;
     city: string;
     ghanaPostGps: string;
@@ -255,6 +256,7 @@ interface AppState {
   submitCheckout: (checkoutData: {
     fullName: string;
     phone: string;
+    address: string;
     region: string;
     city: string;
     ghanaPostGps: string;
@@ -469,69 +471,9 @@ function mapOrderRow(row: OrderDbRow): Order {
   };
 }
 
-// ── Dev seed: appears when Supabase has no products ─────────────
+// ── Dev seed removed — store only shows database products ──────────
 
-const SEED_PRODUCTS: Product[] = [
-  {
-    id: 'seed-product-1',
-    supplierId: 'seed-supplier-1',
-    supplierName: 'Bhra Joe Store',
-    categoryId: 'cat-1',
-    name: 'Samsung Galaxy S24 Ultra 256GB',
-    description: 'Latest Samsung Galaxy S24 Ultra with 256GB storage, titanium design, and advanced camera system. Black, brand new, sealed.',
-    images: [
-      'https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?auto=format&fit=crop&w=800&q=90',
-    ],
-    costPrice: 850,
-    suggestedPrice: 1200,
-    stockQty: 15,
-    sku: 'SGS24U-256-BLK',
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    reviews: [],
-    variants: [],
-  },
-  {
-    id: 'seed-product-2',
-    supplierId: 'seed-supplier-1',
-    supplierName: 'Bhra Joe Store',
-    categoryId: 'cat-2',
-    name: "Women's Ankara Wrap Dress",
-    description: 'Beautiful Ankara print wrap dress for women. Vibrant colors, comfortable fit. Perfect for special occasions.',
-    images: [
-      'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=800&q=90',
-    ],
-    costPrice: 120,
-    suggestedPrice: 280,
-    stockQty: 20,
-    sku: 'AADRESS-M',
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    reviews: [],
-    variants: [],
-  },
-];
 
-const SEED_DROPSHIPPER_PRODUCTS: DropshipperProduct[] = [
-  {
-    id: 'seed-dp-1',
-    dropshipperId: '27b5287a-46b8-4fd8-b5f2-8c2a1a7ded67',
-    productId: SEED_PRODUCTS[0].id,
-    product: SEED_PRODUCTS[0],
-    sellingPrice: 1099,
-    customDescription: 'Express delivery within 24 hours. Pay via MTN MoMo on delivery.',
-    isPublished: true,
-  },
-  {
-    id: 'seed-dp-2',
-    dropshipperId: '27b5287a-46b8-4fd8-b5f2-8c2a1a7ded67',
-    productId: SEED_PRODUCTS[1].id,
-    product: SEED_PRODUCTS[1],
-    sellingPrice: 249,
-    customDescription: 'Free delivery within Accra. Pay via MTN MoMo on delivery.',
-    isPublished: true,
-  },
-];
 
 export const useGlobalStore = create<AppState>((set, get) => ({
   activeRole: 'customer',
@@ -578,7 +520,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       );
 
       if (products.length === 0) {
-        products.push(...SEED_PRODUCTS);
+        // No seed data — require products from the database only
       }
 
       const supplierProfiles: SupplierProfile[] = (supplierProfilesRes.data ?? []).map((sp) =>
@@ -660,7 +602,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       }
 
       if (dropshipperProducts.length === 0) {
-        dropshipperProducts = SEED_DROPSHIPPER_PRODUCTS;
+        // No seed data — require products from the database only
       }
 
       set({
@@ -1090,6 +1032,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       p_dropshipper_id: payload.dropshipperId,
       p_customer_name: payload.fullName,
       p_customer_phone: payload.phone,
+      p_customer_address: payload.address,
       p_customer_city: payload.city,
       p_customer_ghana_post_gps: payload.ghanaPostGps,
       p_customer_region: payload.region,
@@ -1097,7 +1040,10 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       p_notes: payload.notes || null,
     });
 
-    if (error) return { success: false, error: error.message };
+    if (error) {
+      console.error('create_order error:', JSON.stringify(error, null, 2));
+      return { success: false, error: error.message };
+    }
 
     void get().hydrate();
     return { success: true, orderNumber: (data as { order_number?: string } | null)?.order_number };
@@ -1128,13 +1074,17 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         p_dropshipper_id: dropshipperId,
         p_customer_name: checkoutData.fullName,
         p_customer_phone: checkoutData.phone,
+        p_customer_address: checkoutData.address,
         p_customer_city: checkoutData.city,
         p_customer_ghana_post_gps: checkoutData.ghanaPostGps,
         p_customer_region: checkoutData.region,
         p_items: items,
         p_notes: checkoutData.notes || null,
       });
-      if (error) return { success: false, error: error.message };
+      if (error) {
+        console.error('create_order error:', JSON.stringify(error, null, 2));
+        return { success: false, error: error.message };
+      }
       const orderNumber = (data as { order_number?: string } | null)?.order_number;
       firstOrderNumber = firstOrderNumber ?? orderNumber;
     }

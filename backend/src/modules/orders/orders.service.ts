@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { GhanaPostService } from '../ghana-post/ghana-post.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus } from './entities/order.entity';
 import { calculateEstimatedDelivery } from './delivery-estimate';
@@ -18,12 +19,25 @@ export class OrdersService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly config: ConfigService,
+    private readonly ghanaPostService: GhanaPostService,
   ) {
     this.platformFeePercent = this.config.get<number>('app.platformFeePercent') ?? 2;
   }
 
   async create(dto: CreateOrderDto, dropshipperId: string) {
     if (!dto.items.length) throw new BadRequestException('Order must contain at least one item.');
+
+    // Validate GhanaPost GPS address before placing order.
+    if (dto.customerGhanaPostGps) {
+      const validation = await this.ghanaPostService.validateAddress(dto.customerGhanaPostGps);
+      if (!validation.valid) {
+        throw new BadRequestException({
+          message: 'The GhanaPost GPS address could not be verified.',
+          details: validation.message || 'Please check the GPS address and try again.',
+          gpsAddress: validation.gpsAddress,
+        });
+      }
+    }
 
     // Resolve authoritative unit prices server-side. The customer pays the price
     // the dropshipper set when importing the product (dropshipper_products.custom_price).
@@ -82,6 +96,9 @@ export class OrdersService {
         customer_name: dto.customerName,
         customer_phone: dto.customerPhone,
         customer_address: dto.customerAddress,
+        customer_ghana_post_gps: dto.customerGhanaPostGps ?? null,
+        customer_region: dto.customerRegion ?? null,
+        customer_city: dto.customerCity ?? null,
         status: 'pending',
         subtotal,
         platform_fee: platformFee,
