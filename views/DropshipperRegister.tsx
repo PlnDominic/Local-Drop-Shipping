@@ -230,88 +230,88 @@ export const DropshipperRegister: React.FC = () => {
             </>
           )}
 
-          {/* ── Step 2: Ghana Card ── */}
-          {step === 'ghana-card' && (
-            <>
-              <button type="button" onClick={() => setStep('personal')} className="flex items-center gap-1 text-[12px] text-[#777] hover:text-[#151515] mb-4">
-                <ArrowLeft size={13} /> Back
-              </button>
-              <h2 className="text-[24px] font-black text-[#151515]">Upload Ghana Card</h2>
-              <p className="text-[13px] text-[#888] mt-1 mb-6">
-                We need both sides of your Ghana Card to verify your identity. Images must be clear and under 5 MB each.
-              </p>
+{/* ── Step 2: Ghana Card ── */}
+           {step === 'ghana-card' && (
+             <>
+               <button type="button" onClick={() => setStep('personal')} className="flex items-center gap-1 text-[12px] text-[#777] hover:text-[#151515] mb-4">
+                 <ArrowLeft size={13} /> Back
+               </button>
+               <h2 className="text-[24px] font-black text-[#151515]">Upload Ghana Card</h2>
+               <p className="text-[13px] text-[#888] mt-1 mb-6">
+                 We need both sides of your Ghana Card to verify your identity. Images must be clear and under 5 MB each.
+               </p>
 
-              <div className="space-y-5">
-                {/* Front */}
-                <div>
-                  <label className={labelClass}><CreditCard size={10} className="inline mr-1" />Front Side</label>
-                  <div
-                    onClick={() => frontRef.current?.click()}
-                    className={`relative cursor-pointer rounded border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 h-36 ${ghanaCardFront ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50 hover:border-[#f04438]'}`}
-                  >
-                    {frontPreview ? (
-                      <>
-                        <img src={frontPreview} alt="Front" className="h-full w-full object-cover rounded" />
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setGhanaCardFront(null); setFrontPreview(''); }}
-                          className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow"
-                        >
-                          <X size={12} />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <Upload size={20} className="text-[#bbb]" />
-                        <p className="text-[11px] text-[#999]">Click to upload front of Ghana Card</p>
-                        <p className="text-[10px] text-[#bbb]">JPG, PNG, WEBP — max 5 MB</p>
-                      </>
-                    )}
-                  </div>
-                  <input ref={frontRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0], setGhanaCardFront, setFrontPreview)} />
-                </div>
+               <div className="space-y-5">
+                 {/* Front */}
+                 <div>
+                   <label className={labelClass}><CreditCard size={10} className="inline mr-1" />Front Side</label>
+                   <div
+                     onClick={() => frontRef.current?.click()}
+                     className={`relative cursor-pointer rounded border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 h-36 ${ghanaCardFront ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50 hover:border-[#f04438]'}`}
+                   >
+                     {frontPreview ? (
+                       <>
+                         <img src={frontPreview} alt="Front" className="h-full w-full object-cover rounded" />
+                         <button
+                           type="button"
+                           onClick={(e) => { e.stopPropagation(); setGhanaCardFront(null); setFrontPreview(''); }}
+                           className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow"
+                         >
+                           <X size={12} />
+                         </button>
+                       </>
+                     ) : (
+                       <>
+                         <Upload size={20} className="text-[#bbb]" />
+                         <p className="text-[11px] text-[#999]">Click to upload front of Ghana Card</p>
+                         <p className="text-[10px] text-[#bbb]">JPG, PNG, WEBP — max 5 MB</p>
+                       </>
+                     )}
+                   </div>
+                   <input ref={frontRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0], setGhanaCardFront, setFrontPreview)} />
+                 </div>
 
-                {/* Back */}
-                <div>
-                  <label className={labelClass}><CreditCard size={10} className="inline mr-1" />Back Side</label>
-                  <div
-                    onClick={() => backRef.current?.click()}
-                    className={`relative cursor-pointer rounded border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 h-36 ${ghanaCardBack ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50 hover:border-[#f04438]'}`}
-                  >
-                    {backPreview ? (
-                      <>
-                        <img src={backPreview} alt="Back" className="h-full w-full object-cover rounded" />
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setGhanaCardBack(null); setBackPreview(''); }}
-                          className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow"
-                        >
-                          <X size={12} />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <Upload size={20} className="text-[#bbb]" />
-                        <p className="text-[11px] text-[#999]">Click to upload back of Ghana Card</p>
-                        <p className="text-[10px] text-[#bbb]">JPG, PNG, WEBP — max 5 MB</p>
-                      </>
-                    )}
-                  </div>
-                  <input ref={backRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0], setGhanaCardBack, setBackPreview)} />
-                </div>
+                 {/* Back */}
+                 <div>
+                   <label className={labelClass}><CreditCard size={10} className="inline mr-1" />Back Side</label>
+                   <div
+                     onClick={() => backRef.current?.click()}
+                     className={`relative cursor-pointer rounded border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 h-36 ${ghanaCardBack ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50 hover:border-[#f04438]'}`}
+                   >
+                     {backPreview ? (
+                       <>
+                         <img src={backPreview} alt="Back" className="h-full w-full object-cover rounded" />
+                         <button
+                           type="button"
+                           onClick={(e) => { e.stopPropagation(); setGhanaCardBack(null); setBackPreview(''); }}
+                           className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow"
+                         >
+                           <X size={12} />
+                         </button>
+                       </>
+                     ) : (
+                       <>
+                         <Upload size={20} className="text-[#bbb]" />
+                         <p className="text-[11px] text-[#999]">Click to upload back of Ghana Card</p>
+                         <p className="text-[10px] text-[#bbb]">JPG, PNG, WEBP — max 5 MB</p>
+                       </>
+                     )}
+                   </div>
+                   <input ref={backRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0], setGhanaCardBack, setBackPreview)} />
+                 </div>
 
-                <button
-                  type="button"
-                  onClick={goToReview}
-                  className="w-full h-11 rounded bg-[#151515] text-[13px] font-black text-white hover:bg-[#f04438] transition-colors flex items-center justify-center gap-1.5"
-                >
-                  Review & Submit <ArrowRight size={15} />
-                </button>
-              </div>
-            </>
-          )}
+                 <button
+                   type="button"
+                   onClick={goToReview}
+                   className="w-full h-11 rounded bg-[#151515] text-[13px] font-black text-white hover:bg-[#f04438] transition-colors flex items-center justify-center gap-1.5"
+                 >
+                   Review & Submit <ArrowRight size={15} />
+                 </button>
+               </div>
+             </>
+           )}
 
-          {/* ── Step 3: Review ── */}
+           {/* ── Step 3: Review ── */}
           {step === 'review' && (
             <>
               <button type="button" onClick={() => setStep('ghana-card')} className="flex items-center gap-1 text-[12px] text-[#777] hover:text-[#151515] mb-4">

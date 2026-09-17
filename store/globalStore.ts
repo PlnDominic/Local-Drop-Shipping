@@ -33,6 +33,8 @@ export interface DropshipperProfile {
   storeName: string;
   storeSlug: string;
   commissionRate: number;
+  faceVerificationStatus: 'pending' | 'verified' | 'failed';
+  faceVerificationAt?: string | null;
   // Storefront customization
   themeColor: string;
   bannerUrl: string;
@@ -178,7 +180,7 @@ interface AppState {
   supplierProfile: SupplierProfile | null;
   setSupplierProfile: (profile: SupplierProfile | null) => void;
 
-  // Data hydration from Supabase
+  // Hydration state
   hydrated: boolean;
   hydrate: () => Promise<void>;
 
@@ -347,6 +349,8 @@ interface DropshipperProfileDbRow {
   social_links: Record<string, string> | null;
   featured_product_ids: string[] | null;
   created_at: string;
+  face_verification_status: string | null;
+  face_verification_at: string | null;
 }
 
 function mapDropshipperProfileRow(dp: DropshipperProfileDbRow): DropshipperProfile {
@@ -357,6 +361,8 @@ function mapDropshipperProfileRow(dp: DropshipperProfileDbRow): DropshipperProfi
     storeName: dp.store_name ?? '',
     storeSlug: dp.store_slug ?? '',
     commissionRate: Number(dp.commission_rate ?? 0),
+    faceVerificationStatus: (dp.face_verification_status as 'pending' | 'verified' | 'failed') ?? 'pending',
+    faceVerificationAt: dp.face_verification_at ?? null,
     themeColor: dp.theme_color ?? '#f04438',
     bannerUrl: dp.banner_url ?? '',
     tagline: dp.tagline ?? '',

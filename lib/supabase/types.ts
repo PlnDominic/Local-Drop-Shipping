@@ -80,6 +80,9 @@ export interface DropshipperProfileRow {
   whatsapp: string | null;
   social_links: Record<string, string> | null;
   featured_product_ids: string[] | null;
+  // Face verification
+  face_verification_status: string | null;
+  face_verification_at: string | null;
 }
 
 export interface WalletTransactionRow {
@@ -182,6 +185,8 @@ export function mapDropshipperProfile(row: DropshipperProfileRow): DropshipperSt
     logoUrl: row.logo_url ?? undefined,
     location: row.location ?? undefined,
     commissionRate: Number(row.commission_rate ?? 0),
+    faceVerificationStatus: (row.face_verification_status as 'pending' | 'verified' | 'failed') ?? 'pending',
+    faceVerificationAt: row.face_verification_at ?? null,
     createdAt: row.created_at,
     // Storefront customization
     themeColor: row.theme_color ?? '#f04438',

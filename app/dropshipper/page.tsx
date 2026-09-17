@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth/AuthProvider';
 import { useGlobalStore } from '../../store/globalStore';
 import { DropshipperDashboard } from '../../views/DropshipperDashboard';
 import { DropshipperRegister } from '../../views/DropshipperRegister';
+import { FaceVerification } from '../../views/FaceVerification';
 import { SiteHeader } from '../../components/SiteHeader';
 import { supabase } from '../../lib/supabase/client';
 import { ArrowLeft, ArrowRight, User } from 'lucide-react';
@@ -172,6 +173,27 @@ export default function DropshipperPage() {
     // Directly-registered dropshippers never went through store setup — send
     // them there first so they always have a working storefront URL.
     if (!dropshipperProfile) return <CreateStoreForm needsRoleUpdate={false} />;
+    
+    // Face verification is required before accessing the dashboard
+    if (dropshipperProfile.faceVerificationStatus !== 'verified') {
+      return (
+        <div className="min-h-screen bg-[#F9FAFB] font-sans">
+          <SiteHeader />
+          <div className="max-w-3xl mx-auto px-6 py-10">
+            <FaceVerification
+              onVerified={() => {
+                void useGlobalStore.getState().hydrate();
+                window.location.href = '/dropshipper';
+              }}
+              onRetry={() => {
+                // Allow the user to retry verification
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <>
         <SiteHeader />

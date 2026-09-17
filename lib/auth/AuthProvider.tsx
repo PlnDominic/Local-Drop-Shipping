@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase/client';
+import { tokenStore } from '../api/client';
+import { useGlobalStore } from '../../store/globalStore';
 import { mapUser, type UserRow } from '../supabase/types';
 import type { UserProfile } from '../api/types';
 
@@ -32,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const { setCurrentUserId } = useGlobalStore();
 
   const loadProfile = async (userId: string | undefined) => {
     if (!userId) {
@@ -46,18 +49,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(data ? mapUser(data as UserRow) : null);
   };
 
+  // Sync Supabase session → tokenStore + globalStore.currentUserId
   useEffect(() => {
     let active = true;
 
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       setSession(data.session);
-      await loadProfile(data.session?.user.id);
+      if (data.session?.access_token) {
+        tokenStore.set({
+          accessToken: data.session.access_token,
+          refreshToken: data.session.refresh_token ?? '',
+        });
+      }
+      if (data.session?.user?.id) setCurrentUserId(data.session.user.id);
+      await loadProfile(data.session?.user?.id);
       setLoading(false);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession);
+      if (newSession?.access_token) {
+        tokenStore.set({
+          accessToken: newSession.access_token,
+          refreshToken: newSession.refresh_token ?? '',
+        });
+      } else {
+        tokenStore.clear();
+      }
+      if (newSession?.user?.id) setCurrentUserId(newSession.user.id);
       await loadProfile(newSession?.user.id);
       setLoading(false);
     });
@@ -65,8 +85,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       active = false;
       sub.subscription.unsubscribe();
+      setCurrentUserId(null);
     };
-  }, []);
+  }, [setCurrentUserId]);
 
   const signIn: AuthContextValue['signIn'] = async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -99,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    tokenStore.clear();
     setProfile(null);
   };
 

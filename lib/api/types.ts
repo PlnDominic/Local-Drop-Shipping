@@ -164,6 +164,8 @@ export interface DropshipperStoreProfile {
   logoUrl?: string;
   location?: string;
   commissionRate: number;
+  faceVerificationStatus: 'pending' | 'verified' | 'failed';
+  faceVerificationAt?: string | null;
   createdAt: string;
   // Storefront customization
   themeColor: string;

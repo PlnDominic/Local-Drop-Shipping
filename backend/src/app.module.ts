@@ -18,6 +18,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { GhanaPostModule } from './modules/ghana-post/ghana-post.module';
+import { FaceVerificationModule } from './modules/face-verification/face-verification.module';
 
 @Module({
   imports: [
@@ -38,6 +39,8 @@ import { GhanaPostModule } from './modules/ghana-post/ghana-post.module';
     WalletModule,
     NotificationsModule,
     AnalyticsModule,
+    GhanaPostModule,
+    FaceVerificationModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
