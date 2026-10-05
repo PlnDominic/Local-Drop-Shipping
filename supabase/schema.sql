@@ -674,3 +674,166 @@ create policy "admin reads all wallets" on public.wallets for select
 drop policy if exists "admin reads all wallet transactions" on public.wallet_transactions;
 create policy "admin reads all wallet transactions" on public.wallet_transactions for select
   using (public.app_user_role() = 'admin');
+-- ============================================================================
+-- Community wishlist: anyone (signed in or not) can request a product,
+-- feature or supplier they want on the platform and upvote other requests.
+-- Clients only read wishlist_items; all writes go through the SECURITY
+-- DEFINER functions below so vote counts can't be forged. Submitter identity
+-- and contact details live in a separate admin-only table so they are never
+-- publicly readable.
+-- ============================================================================
+
+create table if not exists public.wishlist_items (
+  id             uuid primary key default gen_random_uuid(),
+  kind           text not null default 'product'
+                   check (kind in ('product','feature','supplier')),
+  title          text not null check (char_length(title) between 3 and 120),
+  details        text not null default '' check (char_length(details) <= 1000),
+  category       text,
+  region         text,
+  submitter_name text not null default '' check (char_length(submitter_name) <= 80),
+  vote_count     integer not null default 0,
+  status         text not null default 'open'
+                   check (status in ('open','planned','available','declined')),
+  created_at     timestamptz not null default now()
+);
+
+create table if not exists public.wishlist_submissions (
+  item_id       uuid primary key references public.wishlist_items(id) on delete cascade,
+  submitter_key text not null,
+  contact       text check (char_length(contact) <= 120),
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists idx_wishlist_submitter on public.wishlist_submissions(submitter_key, created_at);
+
+create table if not exists public.wishlist_votes (
+  item_id    uuid not null references public.wishlist_items(id) on delete cascade,
+  voter_key  text not null,
+  created_at timestamptz not null default now(),
+  primary key (item_id, voter_key)
+);
+
+create index if not exists idx_wishlist_votes on public.wishlist_items(vote_count desc);
+
+alter table public.wishlist_items    enable row level security;
+alter table public.wishlist_submissions enable row level security;
+alter table public.wishlist_votes    enable row level security;
+
+drop policy if exists "wishlist is public" on public.wishlist_items;
+create policy "wishlist is public" on public.wishlist_items for select
+  using (status <> 'declined' or public.app_user_role() = 'admin');
+
+drop policy if exists "admin manages wishlist" on public.wishlist_items;
+create policy "admin manages wishlist" on public.wishlist_items for all
+  using (public.app_user_role() = 'admin')
+  with check (public.app_user_role() = 'admin');
+
+drop policy if exists "admin reads wishlist submissions" on public.wishlist_submissions;
+create policy "admin reads wishlist submissions" on public.wishlist_submissions for select
+  using (public.app_user_role() = 'admin');
+
+-- Signed-in voters are keyed by their user id; anonymous voters by a random
+-- key the browser generates once and keeps in localStorage.
+create or replace function public.wishlist_voter_key(p_voter_key text)
+returns text
+language plpgsql
+stable
+as $$
+begin
+  if auth.uid() is not null then
+    return 'u:' || auth.uid()::text;
+  end if;
+  if p_voter_key is null or p_voter_key !~ '^[A-Za-z0-9-]{16,64}$' then
+    raise exception 'Invalid voter key';
+  end if;
+  return 'a:' || p_voter_key;
+end;
+$$;
+
+create or replace function public.submit_wish(
+  p_kind      text,
+  p_title     text,
+  p_details   text default '',
+  p_category  text default null,
+  p_region    text default null,
+  p_name      text default '',
+  p_contact   text default null,
+  p_voter_key text default null
+)
+returns public.wishlist_items
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_key  text := public.wishlist_voter_key(p_voter_key);
+  v_item public.wishlist_items;
+begin
+  -- Basic spam brake: at most 5 wishes per submitter per hour.
+  if (
+    select count(*) from public.wishlist_submissions
+    where submitter_key = v_key and created_at > now() - interval '1 hour'
+  ) >= 5 then
+    raise exception 'You have added a lot of wishes recently. Please try again later.';
+  end if;
+
+  insert into public.wishlist_items (kind, title, details, category, region, submitter_name, vote_count)
+  values (
+    p_kind,
+    btrim(p_title),
+    coalesce(btrim(p_details), ''),
+    nullif(btrim(p_category), ''),
+    nullif(btrim(p_region), ''),
+    coalesce(btrim(p_name), ''),
+    1
+  )
+  returning * into v_item;
+
+  -- The submitter automatically backs their own wish.
+  insert into public.wishlist_votes (item_id, voter_key) values (v_item.id, v_key);
+
+  insert into public.wishlist_submissions (item_id, submitter_key, contact)
+  values (v_item.id, v_key, nullif(btrim(p_contact), ''));
+
+  return v_item;
+end;
+$$;
+
+-- Toggles the caller's vote and returns the item's new state.
+create or replace function public.toggle_wish_vote(
+  p_item_id   uuid,
+  p_voter_key text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_key   text := public.wishlist_voter_key(p_voter_key);
+  v_voted boolean;
+  v_count integer;
+begin
+  if not exists (select 1 from public.wishlist_items where id = p_item_id and status <> 'declined') then
+    raise exception 'Wish not found';
+  end if;
+
+  delete from public.wishlist_votes where item_id = p_item_id and voter_key = v_key;
+  if found then
+    v_voted := false;
+    update public.wishlist_items set vote_count = greatest(vote_count - 1, 0)
+    where id = p_item_id returning vote_count into v_count;
+  else
+    insert into public.wishlist_votes (item_id, voter_key) values (p_item_id, v_key);
+    v_voted := true;
+    update public.wishlist_items set vote_count = vote_count + 1
+    where id = p_item_id returning vote_count into v_count;
+  end if;
+
+  return jsonb_build_object('voted', v_voted, 'voteCount', v_count);
+end;
+$$;
+
+grant execute on function public.submit_wish(text, text, text, text, text, text, text, text) to anon, authenticated;
+grant execute on function public.toggle_wish_vote(uuid, text) to anon, authenticated;

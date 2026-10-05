@@ -42,6 +42,7 @@ const NAV_LINKS = [
   { label: 'New Arrivals', href: '/' },
   { label: 'Supplier Portal', href: '/supplier' },
   { label: 'Start Dropshipping', href: '/dropshipper' },
+  { label: 'Wishlist', href: '/wishlist' },
   { label: 'API Docs', href: '/docs' },
 ];
 
@@ -194,14 +195,14 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
 
           {/* Icons */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              type="button"
+            <Link
+              href="/wishlist"
               aria-label="Wishlist"
-              className="hidden sm:flex flex-col items-center gap-0.5 p-2 text-[#555] hover:text-[#f04438] transition-colors"
+              className={`flex flex-col items-center gap-0.5 p-2 hover:text-[#f04438] transition-colors ${pathname === '/wishlist' ? 'text-[#f04438]' : 'text-[#555]'}`}
             >
               <Heart size={20} />
-              <span className="text-[9px] font-semibold">Wishlist</span>
-            </button>
+              <span className="hidden sm:block text-[9px] font-semibold">Wishlist</span>
+            </Link>
 
             <div className="relative">
               <button
