@@ -42,7 +42,7 @@ const ROLES: {
 ];
 
 const NAV = [
-  { id: 'join', label: 'Join' },
+  { id: 'join', label: 'Join', desktopOnly: true },
   { id: 'dropshippers', label: 'Dropshippers' },
   { id: 'suppliers', label: 'Suppliers' },
   { id: 'contact', label: 'Contact', desktopOnly: true },
@@ -183,8 +183,8 @@ export function Wishlist() {
       {/* ── Floating pill nav ── */}
       <nav className="fixed top-4 inset-x-0 z-30 flex justify-center px-3" aria-label="Page sections">
         <div className="flex max-w-full items-center gap-1 rounded-full bg-white/80 backdrop-blur-xl px-2 py-2 shadow-[0_10px_40px_-10px_rgba(21,21,21,0.25)] border border-white/70">
-          <a href="#join" className="px-3 sm:px-4 text-[13px] sm:text-[14px] font-black tracking-tight whitespace-nowrap">
-            LDS <span className="text-[#f04438]">GH</span>
+          <a href="#join" className="pl-3 pr-2 sm:px-4 text-[13px] sm:text-[15px] font-black tracking-tight whitespace-nowrap">
+            Localdropshipping<span className="text-[#f04438]">gh</span>
           </a>
           <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-none">
             {NAV.map((n) => (
@@ -207,7 +207,7 @@ export function Wishlist() {
       <section id="join" className="relative min-h-screen flex items-center justify-center px-4 pt-24 pb-16">
         <Ribbons />
 
-        <div className="relative w-full max-w-[460px] rounded-[28px] border border-white bg-white/70 backdrop-blur-2xl px-6 py-9 sm:px-9 shadow-[0_40px_90px_-30px_rgba(0,0,0,0.45)] ring-1 ring-black/5">
+        <div className="relative w-full max-w-[620px] rounded-[28px] border border-white bg-white/70 backdrop-blur-2xl px-6 py-9 sm:px-12 sm:py-11 shadow-[0_40px_90px_-30px_rgba(0,0,0,0.45)] ring-1 ring-black/5">
           {joined ? (
             <div className="text-center space-y-4 py-2">
               <CheckCircle2 size={44} className="mx-auto text-[#f04438]" />
@@ -245,7 +245,7 @@ export function Wishlist() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="text-center">
-              <h1 className="text-[30px] sm:text-[36px] font-light leading-tight tracking-tight">Join the waitlist</h1>
+              <h1 className="text-[30px] sm:text-[42px] font-light leading-tight tracking-tight">Join the waitlist</h1>
               <p className="mt-3 text-[15px] leading-relaxed text-[#555]">
                 Get early access to Local Drop Shipping GH, Ghana&apos;s platform for dropshippers and local suppliers.
               </p>
