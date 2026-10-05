@@ -66,7 +66,7 @@ const SupplierProfileForm: React.FC<{ becomingSupplier: boolean }> = ({ becoming
     <div className="min-h-screen bg-[#F9FAFB] font-sans flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-2 mb-6">
-          <Link href="/" className="flex items-center gap-1 text-[12px] text-[#777] hover:text-[#151515]">
+          <Link href="/marketplace" className="flex items-center gap-1 text-[12px] text-[#777] hover:text-[#151515]">
             Back to marketplace
           </Link>
         </div>
@@ -143,7 +143,7 @@ const PendingApproval: React.FC = () => {
           <p className="flex items-center gap-2 text-[#555]"><Mail size={13} className="text-[#f04438]" /> {profile?.email}</p>
         </div>
         <Link
-          href="/"
+          href="/marketplace"
           className="mt-6 inline-block h-11 rounded bg-[#151515] px-6 text-[12px] font-black leading-[44px] text-white hover:bg-[#f04438] transition-colors"
         >
           Back to marketplace

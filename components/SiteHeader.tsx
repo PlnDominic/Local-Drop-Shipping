@@ -38,8 +38,8 @@ export const DEFAULT_HEADER_CATEGORIES: HeaderCategory[] = [
 ];
 
 const NAV_LINKS = [
-  { label: 'Marketplace', href: '/' },
-  { label: 'New Arrivals', href: '/' },
+  { label: 'Marketplace', href: '/marketplace' },
+  { label: 'New Arrivals', href: '/marketplace' },
   { label: 'Supplier Portal', href: '/supplier' },
   { label: 'Start Dropshipping', href: '/dropshipper' },
   { label: 'Wishlist', href: '/wishlist' },
@@ -95,7 +95,7 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
 
   const goToMarketplace = (params: Record<string, string>) => {
     const usp = new URLSearchParams(params);
-    router.push(usp.toString() ? `/?${usp.toString()}` : '/');
+    router.push(usp.toString() ? `/marketplace?${usp.toString()}` : '/marketplace');
   };
 
   const handleSearchSubmit = (e?: React.FormEvent) => {
@@ -104,7 +104,7 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
       onSearchSubmit();
       return;
     }
-    if (pathname !== '/') {
+    if (pathname !== '/marketplace') {
       goToMarketplace(query.trim() ? { q: query.trim() } : {});
     }
   };
@@ -113,13 +113,13 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
     setCategoryMenuOpen(false);
     if (onCategoryChange) {
       onCategoryChange(id);
-      if (pathname === '/') {
+      if (pathname === '/marketplace') {
         document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
       }
       return;
     }
     setLocalCategory(id);
-    if (pathname !== '/') {
+    if (pathname !== '/marketplace') {
       goToMarketplace(id !== 'all' ? { category: id } : {});
     } else {
       document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
@@ -198,7 +198,7 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
             <Link
               href="/wishlist"
               aria-label="Wishlist"
-              className={`flex flex-col items-center gap-0.5 p-2 hover:text-[#f04438] transition-colors ${pathname === '/wishlist' ? 'text-[#f04438]' : 'text-[#555]'}`}
+              className={`flex flex-col items-center gap-0.5 p-2 hover:text-[#f04438] transition-colors ${pathname === '/' || pathname === '/wishlist' ? 'text-[#f04438]' : 'text-[#555]'}`}
             >
               <Heart size={20} />
               <span className="hidden sm:block text-[9px] font-semibold">Wishlist</span>

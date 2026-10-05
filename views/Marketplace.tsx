@@ -1115,7 +1115,7 @@ export const Marketplace: React.FC = () => {
           <div>
             <h4 className="text-[13px] font-black mb-4 text-gray-200">Quick Links</h4>
             {[
-              { label: 'Marketplace', href: '/' },
+              { label: 'Marketplace', href: '/marketplace' },
               { label: 'Start Dropshipping', href: '/dropshipper' },
               { label: 'Supplier Portal', href: '/supplier' },
               { label: 'Admin Panel', href: '/admin' },

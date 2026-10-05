@@ -23,7 +23,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7
     },
     {
-      url: `${baseUrl}/wishlist`,
+      url: `${baseUrl}/marketplace`,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.8

@@ -544,7 +544,7 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
       {/* ── 2. Store Header ── */}
       <header className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-30 shadow-xs">
         <div className="max-w-[1280px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2 group text-[#777] hover:text-[#151515] transition-colors">
+          <Link href="/marketplace" className="flex items-center gap-2 group text-[#777] hover:text-[#151515] transition-colors">
             <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
             <span className="text-[11px] font-semibold hidden sm:inline">Back to marketplace</span>
           </Link>

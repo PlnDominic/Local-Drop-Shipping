@@ -144,7 +144,7 @@ export const SupplierRegister: React.FC = () => {
           </p>
         </div>
 
-        <Link href="/" className="relative flex items-center gap-1.5 text-[12px] font-bold text-gray-400 hover:text-white transition-colors w-fit">
+        <Link href="/marketplace" className="relative flex items-center gap-1.5 text-[12px] font-bold text-gray-400 hover:text-white transition-colors w-fit">
           <ArrowLeft size={14} /> Back to marketplace
         </Link>
       </div>

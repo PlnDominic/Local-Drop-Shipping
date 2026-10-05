@@ -81,7 +81,7 @@ const CreateStoreForm: React.FC<{ needsRoleUpdate: boolean }> = ({ needsRoleUpda
         <div className="flex items-center gap-2 mb-6">
           <button
             type="button"
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/marketplace')}
             className="flex items-center gap-1 text-[12px] text-[#777] hover:text-[#151515]"
           >
             <ArrowLeft size={13} /> Back to marketplace
