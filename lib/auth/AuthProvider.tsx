@@ -22,6 +22,10 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (params: SignUpParams) => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
+  /** Emails a password-reset link that lands on /reset-password. */
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
+  /** Sets a new password for the current (recovery) session. */
+  updatePassword: (password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -97,6 +101,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error?.message ?? null };
   };
 
+  const resetPassword: AuthContextValue['resetPassword'] = async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // Must be in the Supabase "Redirect URLs" allow list.
+      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined,
+    });
+    return { error: error?.message ?? null };
+  };
+
+  const updatePassword: AuthContextValue['updatePassword'] = async (password) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error: error?.message ?? null };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
@@ -107,7 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signInWithGoogle, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signInWithGoogle, resetPassword, updatePassword, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

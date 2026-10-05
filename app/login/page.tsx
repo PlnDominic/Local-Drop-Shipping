@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../lib/auth/AuthProvider';
 import { ArrowLeft, ArrowRight, CheckCircle2, ShoppingBag, TrendingUp, Truck } from 'lucide-react';
 
-type Mode = 'signin' | 'signup';
+type Mode = 'signin' | 'signup' | 'forgot';
 type Role = 'customer' | 'dropshipper' | 'supplier';
 
 const roleOptions: { id: Role; label: string; desc: string; icon: typeof ShoppingBag }[] = [
@@ -27,7 +27,7 @@ const GoogleIcon: React.FC = () => (
 function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { session, signIn, signUp, signInWithGoogle } = useAuth();
+  const { session, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
 
   const [mode, setMode] = useState<Mode>('signin');
   const [fullName, setFullName] = useState('');
@@ -37,10 +37,13 @@ function LoginPageInner() {
   const [role, setRole] = useState<Role>('customer');
 
   const [error, setError] = useState('');
+  const msg = searchParams.get('msg');
   const [info, setInfo] = useState(
-    searchParams.get('msg') === 'confirm'
+    msg === 'confirm'
       ? 'Account created! Check your email to confirm, then sign in.'
-      : '',
+      : msg === 'reset'
+        ? 'Password updated. Sign in with your new password.'
+        : '',
   );
   const [submitting, setSubmitting] = useState(false);
 
@@ -56,6 +59,15 @@ function LoginPageInner() {
     setError('');
     setInfo('');
     setSubmitting(true);
+
+    if (mode === 'forgot') {
+      const { error: err } = await resetPassword(email.trim());
+      setSubmitting(false);
+      if (err) return setError(err);
+      // Same message whether or not the email has an account, so it can't be probed.
+      setInfo("If an account exists for that email, we've sent a link to reset your password. Check your inbox and spam folder.");
+      return;
+    }
 
     if (mode === 'signin') {
       const { error: err } = await signIn(email, password);
@@ -124,13 +136,18 @@ function LoginPageInner() {
           </Link>
 
           <h2 className="text-[24px] font-black text-[#151515]">
-            {mode === 'signin' ? 'Welcome back' : 'Create your account'}
+            {mode === 'signin' ? 'Welcome back' : mode === 'signup' ? 'Create your account' : 'Reset your password'}
           </h2>
           <p className="text-[13px] text-[#888] mt-1">
-            {mode === 'signin' ? 'Sign in to your account to continue.' : 'Join thousands selling across Ghana.'}
+            {mode === 'signin'
+              ? 'Sign in to your account to continue.'
+              : mode === 'signup'
+                ? 'Join thousands selling across Ghana.'
+                : "Enter your email and we'll send you a link to choose a new password."}
           </p>
 
           {/* Mode toggle */}
+          {mode !== 'forgot' && (
           <div className="mt-6 grid grid-cols-2 gap-1 rounded bg-gray-100 p-1">
             {(['signin', 'signup'] as Mode[]).map((m) => (
               <button
@@ -145,8 +162,11 @@ function LoginPageInner() {
               </button>
             ))}
           </div>
+          )}
 
           {/* Google OAuth */}
+          {mode !== 'forgot' && (
+          <>
           <button
             type="button"
             onClick={handleGoogle}
@@ -162,6 +182,8 @@ function LoginPageInner() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#aaa]">or with email</span>
             <span className="h-px flex-1 bg-gray-200" />
           </div>
+          </>
+          )}
 
           {info && (
             <div className="mt-5 flex items-start gap-2 rounded bg-[#f04438]/10 px-3 py-3 text-[12px] text-[#c0392b] border border-[#f04438]/20">
@@ -213,29 +235,42 @@ function LoginPageInner() {
               <label className={labelClass}>Email</label>
               <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className={inputClass} />
             </div>
-            <div>
-              <label className={labelClass}>Password</label>
-              <input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
-            </div>
+            {mode !== 'forgot' && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className={labelClass}>Password</label>
+                  {mode === 'signin' && (
+                    <button
+                      type="button"
+                      onClick={() => { setMode('forgot'); setError(''); setInfo(''); }}
+                      className="mb-1 text-[11px] font-bold text-[#f04438] hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+                <input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
+              </div>
+            )}
 
             <button
               type="submit"
               disabled={submitting}
               className="w-full h-11 rounded bg-[#151515] text-[13px] font-black text-white hover:bg-[#f04438] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
             >
-              {submitting ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+              {submitting ? 'Please wait…' : mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send reset link'}
               {!submitting && <ArrowRight size={15} />}
             </button>
           </form>
 
           <p className="mt-6 text-center text-[12px] text-[#888]">
-            {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+            {mode === 'signin' ? "Don't have an account? " : mode === 'signup' ? 'Already have an account? ' : 'Remembered it? '}
             <button
               type="button"
               onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); setInfo(''); }}
               className="font-black text-[#f04438] hover:underline"
             >
-              {mode === 'signin' ? 'Sign up' : 'Sign in'}
+              {mode === 'signin' ? 'Sign up' : mode === 'signup' ? 'Sign in' : 'Back to sign in'}
             </button>
           </p>
         </div>
