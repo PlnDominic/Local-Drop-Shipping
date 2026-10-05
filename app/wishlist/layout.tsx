@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Community Wishlist - Local Drop Shipping GH',
+  title: 'Join the Wishlist - Local Drop Shipping GH',
   description:
-    'Tell us what you wish you could buy or sell in Ghana. Add products, suppliers and features to the Local Drop Shipping GH wishlist and upvote what others want.',
+    'Dropshippers and suppliers in Ghana: join the Local Drop Shipping GH wishlist and get an invite to create your account on launch day.',
   alternates: { canonical: 'https://www.localdropshippinggh.com/' },
   openGraph: {
-    title: 'What do you wish we sold? - Local Drop Shipping GH',
-    description: 'Add your wish and upvote what others want. The most-wanted items get sourced first.',
+    title: 'Local Drop Shipping GH is launching soon',
+    description: 'Dropship or supply products across Ghana. Join the wishlist for early access.',
     url: 'https://www.localdropshippinggh.com/',
     type: 'website',
   },
