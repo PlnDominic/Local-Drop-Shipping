@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
 import type { Order, SupplierProfile } from '../store/globalStore';
+import { WishlistSignupsPanel } from '../components/admin/WishlistSignupsPanel';
 import {
   LayoutGrid,
   FileCheck,
@@ -19,6 +20,7 @@ import {
   Package,
   Truck,
   UserPlus,
+  Heart,
 } from 'lucide-react';
 
 const formatMoney = (amount: number) =>
@@ -27,7 +29,7 @@ const formatMoney = (amount: number) =>
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-type Tab = 'overview' | 'suppliers' | 'dropshippers' | 'orders' | 'revenue' | 'users' | 'activity';
+type Tab = 'wishlist' | 'overview' | 'suppliers' | 'dropshippers' | 'orders' | 'revenue' | 'users' | 'activity';
 
 const STATUS_STYLE: Record<Order['status'], string> = {
   pending: 'bg-yellow-50 text-yellow-700',
@@ -48,7 +50,9 @@ export const AdminDashboard: React.FC = () => {
     setSupplierApproval,
   } = useGlobalStore();
 
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  // Pre-launch the wishlist is the main thing to manage, so it opens first.
+  const [activeTab, setActiveTab] = useState<Tab>('wishlist');
+  const [wishlistPending, setWishlistPending] = useState(0);
   const [supplierQuery, setSupplierQuery] = useState('');
   const [dropshipperQuery, setDropshipperQuery] = useState('');
   const [userQuery, setUserQuery] = useState('');
@@ -124,6 +128,7 @@ export const AdminDashboard: React.FC = () => {
     .slice(0, 40);
 
   const tabs: { id: Tab; label: string; icon: typeof LayoutGrid; badge?: number }[] = [
+    { id: 'wishlist', label: 'Wishlist', icon: Heart, badge: wishlistPending },
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
     { id: 'suppliers', label: 'Suppliers', icon: FileCheck, badge: pendingSuppliers.length },
     { id: 'dropshippers', label: 'Dropshippers', icon: Store },
@@ -218,6 +223,11 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       <div className="max-w-[1280px] mx-auto px-4 py-5 space-y-4">
+
+        {/* ── WISHLIST ── kept mounted so the tab badge loads with the dashboard */}
+        <div className={activeTab === 'wishlist' ? '' : 'hidden'}>
+          <WishlistSignupsPanel onCountsChange={setWishlistPending} />
+        </div>
 
         {/* ── OVERVIEW ── */}
         {activeTab === 'overview' && (
