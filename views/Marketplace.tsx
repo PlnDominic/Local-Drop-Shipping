@@ -1128,10 +1128,15 @@ export const Marketplace: React.FC = () => {
 
           <div>
             <h4 className="text-[13px] font-black mb-4 text-gray-200">Support</h4>
-            {['Contact Us', 'Shipping Info', 'Return Policy', 'FAQ', 'Track Order'].map((link) => (
-              <a key={link} href="#" onClick={(e) => e.preventDefault()} className="block text-[12px] text-gray-400 hover:text-white mb-2 transition-colors">
-                {link}
-              </a>
+            {[
+              { label: 'Support', href: '/support' },
+              { label: 'Shipping Info', href: '/shipping' },
+              { label: 'Returns & Refunds', href: '/returns' },
+              { label: 'My Orders', href: '/orders' },
+            ].map(({ label, href }) => (
+              <Link key={label} href={href} className="block text-[12px] text-gray-400 hover:text-white mb-2 transition-colors">
+                {label}
+              </Link>
             ))}
           </div>
 
@@ -1150,8 +1155,8 @@ export const Marketplace: React.FC = () => {
           <div className="max-w-[1280px] mx-auto px-4 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-gray-500">
             <span>© {new Date().getFullYear()} Local Drop Shipping GH. All Rights Reserved.</span>
             <div className="flex gap-6">
-              <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-white transition-colors">Terms of Service</a>
-              <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-white transition-colors">Privacy Policy</a>
+              <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+              <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
             </div>
             <span>
               Developed by{' '}

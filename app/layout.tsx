@@ -3,6 +3,7 @@ import './globals.css';
 import { ToastContainer } from '../components/Toast';
 import { AuthProvider } from '../lib/auth/AuthProvider';
 import { HydrationGate } from '../components/HydrationGate';
+import { CookieNotice } from '../components/CookieNotice';
 
 const heroImage = 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=90';
 
@@ -51,6 +52,7 @@ export default function RootLayout({
           <HydrationGate />
           {children}
           <ToastContainer />
+          <CookieNotice />
         </AuthProvider>
       </body>
     </html>

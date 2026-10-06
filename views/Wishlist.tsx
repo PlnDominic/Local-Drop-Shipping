@@ -381,6 +381,10 @@ export function Wishlist() {
         <div className="max-w-[980px] mx-auto px-4 py-8 flex flex-wrap items-center justify-between gap-3 text-[13px] text-gray-400">
           <span>© {new Date().getFullYear()} Local Drop Shipping GH · Accra, Ghana</span>
           <span className="inline-flex items-center gap-4 font-semibold">
+            <a href="/terms" className="hover:text-[#f04438]">Terms</a>
+            <a href="/privacy" className="hover:text-[#f04438]">Privacy</a>
+          </span>
+          <span className="inline-flex items-center gap-4 font-semibold">
             <a href="tel:+233556609232" className="hover:text-[#f04438]">+233 55 660 9232</a>
             <a href="tel:+233542855399" className="hover:text-[#f04438]">+233 54 285 5399</a>
           </span>

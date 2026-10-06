@@ -34,6 +34,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.5
     },
+    ...['terms', 'privacy', 'shipping', 'returns'].map((page) => ({
+      url: `${baseUrl}/${page}`,
+      lastModified: new Date(),
+      changeFrequency: 'yearly' as const,
+      priority: 0.3
+    })),
     {
       url: `${baseUrl}/docs`,
       lastModified: new Date(),
