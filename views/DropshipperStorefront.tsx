@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { DeliveryFields } from '../components/checkout/DeliveryFields';
-import { SupplierName } from '../components/SupplierName';
+import { SaveButton } from '../components/SaveButton';
+import { buildIndex, runSearch } from '../lib/search';
 import { isValidGhanaPostGps, normalizeGhanaPostGps, type DeliveryQuote } from '../lib/checkout';
 import { useRouter } from 'next/navigation';
 import {
@@ -11,7 +12,7 @@ import {
   ArrowRight,
   CheckCircle2,
   CreditCard,
-  Heart,
+  Package,
   MapPin,
   Minus,
   MessageCircle,
@@ -19,7 +20,6 @@ import {
   Search,
   ShoppingCart,
   Sparkles,
-  Star,
   Truck,
   X,
   Instagram,
@@ -31,6 +31,7 @@ import {
   getCategories,
   getDropshipperStoreBySlug,
   getPublishedDropshipperProducts,
+  getProductIdsWithOptions,
 } from '../lib/supabase/queries';
 import type { Category } from '../lib/supabase/types';
 import type { DropshipperProduct, DropshipperStoreProfile } from '../lib/api/types';
@@ -40,139 +41,26 @@ import { useGlobalStore } from '../store/globalStore';
 const formatMoney = (amount: number) =>
   `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
-const StarDisplay: React.FC<{ rating: number; size?: number; color?: string }> = ({ rating, size = 13, color = '#f5a524' }) => (
-  <span className="inline-flex items-center gap-0.5">
-    {[1, 2, 3, 4, 5].map((n) => (
-      <Star
-        key={n}
-        size={size}
-        fill={n <= Math.round(rating) ? color : 'none'}
-        stroke={n <= Math.round(rating) ? color : '#ccc'}
-        strokeWidth={1.5}
-      />
-    ))}
-  </span>
-);
-
 interface CartLine {
   dropshipperProductId: string;
   quantity: number;
 }
 
-const ProductModal: React.FC<{
-  product: DropshipperProduct;
-  themeColor: string;
-  onClose: () => void;
-  onAddToCart: (id: string) => void;
-  onBuyNow: (id: string) => void;
-}> = ({ product, themeColor, onClose, onAddToCart, onBuyNow }) => {
-  const discount = product.product.suggestedPrice > product.sellingPrice
-    ? Math.round(((product.product.suggestedPrice - product.sellingPrice) / product.product.suggestedPrice) * 100)
-    : 0;
-
-  return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="relative w-full max-w-2xl bg-white shadow-2xl rounded-xl max-h-[90vh] overflow-y-auto">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-white hover:bg-gray-50 shadow-sm"
-        >
-          <X size={18} />
-        </button>
-
-        <div className="grid md:grid-cols-2">
-          <div className="bg-[#f7f7f7] aspect-square flex items-center justify-center p-8 rounded-tl-xl md:rounded-bl-xl">
-            <img
-              src={product.product.images[0] || 'https://via.placeholder.com/300x300?text=No+Image'}
-              alt={product.product.name}
-              className="h-full w-full object-contain mix-blend-multiply"
-            />
-          </div>
-          <div className="p-6 flex flex-col gap-4">
-            <div>
-              <span
-                className="inline-block text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full mb-2"
-                style={{ backgroundColor: `${themeColor}15`, color: themeColor }}
-              >
-                {product.product.categorySlug || 'Product'}
-              </span>
-              <h2 className="text-[20px] font-black leading-tight text-[#151515]">
-                {product.product.name}
-              </h2>
-              <p className="mt-1 text-xs text-[#777]"><SupplierName supplierId={product.product.supplierId} name={product.product.supplierName} /></p>
-            </div>
-            <p className="text-sm leading-relaxed text-[#444]">
-              {product.customDescription || product.product.description}
-            </p>
-            <div className="flex items-center gap-3">
-              <StarDisplay rating={0} size={16} color={themeColor} />
-              <span className="text-xs font-bold text-[#777]">No reviews yet</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <strong className="text-2xl font-black" style={{ color: themeColor }}>
-                {formatMoney(product.sellingPrice)}
-              </strong>
-              {discount > 0 && (
-                <span className="text-sm text-[#bbb] line-through">{formatMoney(product.product.suggestedPrice)}</span>
-              )}
-            </div>
-            {product.product.stockQty > 0 ? (
-              <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-                {product.product.stockQty} in stock
-              </p>
-            ) : (
-              <p className="text-xs text-red-500 font-semibold">Out of stock</p>
-            )}
-
-            <div className="grid grid-cols-2 gap-2 mt-auto pt-4">
-              <button
-                type="button"
-                onClick={() => { onAddToCart(product.id); onClose(); }}
-                className="h-11 rounded-lg border border-[#151515] bg-white px-3 text-[11px] font-black text-[#151515] transition-colors hover:bg-gray-50"
-              >
-                Add to Cart
-              </button>
-              <button
-                type="button"
-                onClick={() => { onBuyNow(product.id); onClose(); }}
-                disabled={product.product.stockQty <= 0}
-                style={{ backgroundColor: themeColor }}
-                className="h-11 rounded-lg px-3 text-[11px] font-black text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Buy Now
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const ProductCard: React.FC<{
   product: DropshipperProduct;
   themeColor: string;
   isFeatured?: boolean;
+  hasOptions?: boolean;
   onAddToCart: (id: string) => void;
-  onOpenDetail: (product: DropshipperProduct) => void;
-}> = ({ product, themeColor, isFeatured, onAddToCart, onOpenDetail }) => {
+}> = ({ product, themeColor, isFeatured, hasOptions, onAddToCart }) => {
+  const href = `/product/${product.id}`;
   const discount = product.product.suggestedPrice > product.sellingPrice
     ? Math.round(((product.product.suggestedPrice - product.sellingPrice) / product.product.suggestedPrice) * 100)
     : 0;
 
   return (
     <article className="group min-w-0 bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col">
-      <div
-        className="relative overflow-hidden bg-[#f7f7f7] aspect-square cursor-pointer"
-        onClick={() => onOpenDetail(product)}
-      >
+      <div className="relative overflow-hidden bg-[#f7f7f7] aspect-square">
         {discount > 0 && (
           <span
             className="absolute left-2.5 top-2.5 z-10 px-2 py-0.5 text-[10px] font-black text-white rounded-full shadow-sm"
@@ -189,52 +77,57 @@ const ProductCard: React.FC<{
             <Sparkles size={10} style={{ color: themeColor }} /> Featured
           </span>
         )}
-        <button
-          type="button"
-          aria-label="Wishlist"
-          onClick={(e) => { e.stopPropagation(); }}
-          className="absolute right-2.5 top-2.5 z-10 grid h-7 w-7 place-items-center rounded-full bg-white shadow opacity-0 group-hover:opacity-100 transition-opacity"
-          style={isFeatured ? { top: '32px' } : undefined}
-        >
-          <Heart size={13} className="text-gray-400 hover:text-red-500 transition-colors" />
-        </button>
-        <img
-          src={product.product.images[0] || 'https://via.placeholder.com/300x300?text=No+Image'}
-          alt={product.product.name}
-          className="h-full w-full object-contain p-4 mix-blend-multiply transition-transform duration-500 group-hover:scale-105"
+        <SaveButton
+          dropshipperProductId={product.id}
+          className="absolute right-2.5 z-10"
         />
+        <Link href={href} className="flex h-full w-full items-center justify-center" aria-label={product.product.name}>
+          {product.product.images[0] ? (
+            <img
+              src={product.product.images[0]}
+              alt={product.product.name}
+              loading="lazy"
+              className="h-full w-full object-contain p-4 mix-blend-multiply transition-transform duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <Package size={36} className="text-gray-300" />
+          )}
+        </Link>
       </div>
       <div className="p-3.5 flex flex-col flex-1">
         <span className="text-[9px] font-bold text-[#777] uppercase tracking-wider">
           {product.product.categorySlug || 'Product'}
         </span>
-        <h3
-          className="mt-1 line-clamp-2 text-[13px] font-bold leading-snug text-[#151515] cursor-pointer hover:opacity-80 transition-opacity"
-          onClick={() => onOpenDetail(product)}
-        >
-          {product.product.name}
+        <h3 className="mt-1 line-clamp-2 text-[13px] font-bold leading-snug text-[#151515] hover:opacity-80 transition-opacity">
+          <Link href={href}>{product.product.name}</Link>
         </h3>
-        <div className="mt-1 flex items-center gap-1">
-          <StarDisplay rating={0} size={10} color={themeColor} />
-          <span className="text-[10px] text-[#999]">(0)</span>
-        </div>
         <div className="mt-2.5 flex items-center gap-2">
           <span className="text-[15px] font-black" style={{ color: themeColor }}>
+            {hasOptions && <span className="mr-1 text-[10px] font-bold text-[#999]">From</span>}
             {formatMoney(product.sellingPrice)}
           </span>
           {discount > 0 && (
             <span className="text-[11px] text-[#bbb] line-through">{formatMoney(product.product.suggestedPrice)}</span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => onAddToCart(product.id)}
-          className="mt-3 w-full h-9 rounded-lg bg-[#151515] text-[11px] font-black text-white transition-all hover:shadow-md"
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = themeColor; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#151515'; }}
-        >
-          Add to Cart
-        </button>
+        {hasOptions ? (
+          <Link
+            href={href}
+            className="mt-3 flex h-9 w-full items-center justify-center rounded-lg bg-[#151515] text-[11px] font-black text-white transition-all hover:shadow-md"
+          >
+            Select options
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onAddToCart(product.id)}
+            className="mt-3 w-full h-9 rounded-lg bg-[#151515] text-[11px] font-black text-white transition-all hover:shadow-md"
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = themeColor; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#151515'; }}
+          >
+            Add to Cart
+          </button>
+        )}
       </div>
     </article>
   );
@@ -260,7 +153,8 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
   const [activeCategory, setActiveCategory] = useState('all');
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [detailProduct, setDetailProduct] = useState<DropshipperProduct | null>(null);
+  // Products that have size/colour options; those are chosen on the product page.
+  const [optionProductIds, setOptionProductIds] = useState<Set<string>>(new Set());
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
@@ -294,9 +188,14 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
         setStore(storeRes);
         setCategories(catsRes);
 
-        const productsRes = await getPublishedDropshipperProducts(storeRes.id);
+        const [productsRes, withOptions] = await Promise.all([
+          getPublishedDropshipperProducts(storeRes.id),
+          getProductIdsWithOptions(),
+        ]);
         if (active) {
-          if (productsRes.length === 0) {
+          setOptionProductIds(withOptions);
+          // Demo products are only shown when explicitly enabled; a real store with no items stays empty.
+          if (productsRes.length === 0 && process.env.NEXT_PUBLIC_SHOW_DEMO_PRODUCTS === 'true') {
             setProducts([
               {
                 id: 'seed-dp-1',
@@ -412,17 +311,6 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
 
   const clearCart = () => setCart([]);
 
-  const handleBuyNow = (dropshipperProductId: string) => {
-    addToCart(dropshipperProductId);
-    if (!currentUserId) {
-      setCartOpen(true);
-      showToast('Please sign in to check out.', 'error');
-      router.push('/login');
-      return;
-    }
-    setCartOpen(true);
-    setCheckoutOpen(true);
-  };
 
   const handleCheckout = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -477,19 +365,22 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
     return products.filter((p) => store.featuredProductIds.includes(p.id) || store.featuredProductIds.includes(p.productId));
   }, [products, store?.featuredProductIds]);
 
-  // ── Filter products by search & category ──
-  const filteredProducts = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return products.filter((item) => {
-      const matchesCategory = activeCategory === 'all' || item.product.categoryId === activeCategory;
-      const matchesSearch =
-        q.length === 0 ||
-        item.product.name.toLowerCase().includes(q) ||
-        item.customDescription.toLowerCase().includes(q) ||
-        item.product.supplierName.toLowerCase().includes(q);
-      return matchesCategory && matchesSearch;
-    });
-  }, [activeCategory, products, query]);
+  // ── Filter products by search & category (typo-tolerant, best match first) ──
+  const searchIndex = useMemo(
+    () =>
+      buildIndex(products, (item) => ({
+        name: item.product.name,
+        sku: item.product.sku,
+        category: item.product.categorySlug,
+        supplier: item.product.supplierName,
+        description: item.customDescription,
+      })),
+    [products],
+  );
+  const filteredProducts = useMemo(
+    () => runSearch(searchIndex, query).results.filter((item) => activeCategory === 'all' || item.product.categoryId === activeCategory),
+    [activeCategory, searchIndex, query],
+  );
 
   // ── Loading state ──
   if (loading) {
@@ -702,8 +593,8 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
                   product={product}
                   themeColor={themeColor}
                   isFeatured
+                  hasOptions={optionProductIds.has(product.productId)}
                   onAddToCart={addToCart}
-                  onOpenDetail={setDetailProduct}
                 />
               ))}
             </div>
@@ -811,8 +702,8 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
                 key={product.id}
                 product={product}
                 themeColor={themeColor}
+                hasOptions={optionProductIds.has(product.productId)}
                 onAddToCart={addToCart}
-                onOpenDetail={setDetailProduct}
               />
             ))}
           </div>
@@ -969,17 +860,6 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
           </span>
         </div>
       </footer>
-
-      {/* ── 9. Product Detail Modal ── */}
-      {detailProduct && (
-        <ProductModal
-          product={detailProduct}
-          themeColor={themeColor}
-          onClose={() => setDetailProduct(null)}
-          onAddToCart={addToCart}
-          onBuyNow={handleBuyNow}
-        />
-      )}
 
       {/* ── 10. Cart Drawer ── */}
       {cartOpen && (

@@ -70,6 +70,11 @@ export interface ProductVariant {
   stockQty: number;
 }
 
+export interface ProductSpec {
+  label: string;
+  value: string;
+}
+
 export interface Product {
   id: string;
   supplierId: string;
@@ -78,6 +83,8 @@ export interface Product {
   name: string;
   description: string;
   images: string[];
+  /** Label/value rows shown in the product page's specifications table. */
+  specs: ProductSpec[];
   costPrice: number;
   suggestedPrice: number;
   stockQty: number;
@@ -96,6 +103,10 @@ export interface DropshipperProduct {
   sellingPrice: number;
   customDescription: string;
   isPublished: boolean;
+  createdAt?: string;
+  /** Set on public catalog items so cards and pages can name and link the store. */
+  storeName?: string;
+  storeSlug?: string;
 }
 
 export interface OrderItem {
@@ -200,6 +211,10 @@ interface AppState {
   categories: Category[];
   products: Product[];
   dropshipperProducts: DropshipperProduct[];
+  /** Every published item across all stores: what visitors browse and buy. */
+  catalog: DropshipperProduct[];
+  /** Store-item ids the signed-in customer has saved for later. */
+  savedIds: string[];
   orders: Order[];
   wallets: Record<string, Wallet>; // key: userId
   transactions: Transaction[];
@@ -219,6 +234,9 @@ interface AppState {
   updateCartQuantity: (dropshipperProductId: string, qty: number, variantId?: string) => void;
   clearCart: () => void;
 
+  // Saved items
+  toggleSaved: (dropshipperProductId: string) => Promise<{ ok: boolean; saved?: boolean; error?: string }>;
+
   // Supplier Actions
   /** Create or update the current user's supplier profile (application for approval). */
   submitSupplierProfile: (payload: {
@@ -228,7 +246,7 @@ interface AppState {
     description: string;
   }) => Promise<{ error: string | null }>;
   addSupplierProduct: (productData: Omit<Product, 'id' | 'supplierId' | 'supplierName' | 'createdAt'>) => void;
-  addSupplierProductsBulk: (rows: Omit<Product, 'id' | 'supplierId' | 'supplierName' | 'createdAt' | 'reviews' | 'variants'>[]) => number;
+  addSupplierProductsBulk: (rows: Omit<Product, 'id' | 'supplierId' | 'supplierName' | 'createdAt' | 'reviews' | 'variants' | 'specs'>[]) => number;
   updateSupplierProductStock: (productId: string, newQty: number) => void;
   updateVariantStock: (productId: string, variantId: string, newQty: number) => void;
   fulfillOrder: (orderId: string) => Promise<void>;
@@ -248,7 +266,7 @@ interface AppState {
   /** Places an order against a single dropshipper's store (e.g. from a storefront cart). */
   submitOrder: (payload: {
     dropshipperId: string;
-    items: Array<{ productId: string; quantity: number }>;
+    items: Array<{ productId: string; quantity: number; variantId?: string }>;
     fullName: string;
     phone: string;
     region: string;
@@ -273,6 +291,12 @@ interface AppState {
   approveSupplier: (supplierProfileId: string) => void;
 }
 
+/**
+ * Demo products are only shown when explicitly enabled (NEXT_PUBLIC_SHOW_DEMO_PRODUCTS=true).
+ * Otherwise visitors only ever see real, orderable products.
+ */
+const SHOW_DEMO_DATA = process.env.NEXT_PUBLIC_SHOW_DEMO_PRODUCTS === 'true';
+
 // ── DB row → store type mappers (snake_case → camelCase) ─────────────────────
 
 interface ProductDbRow {
@@ -288,7 +312,35 @@ interface ProductDbRow {
   sku: string;
   is_active: boolean;
   created_at: string;
+  specs?: unknown;
   supplier_profiles?: { business_name: string } | null;
+}
+
+interface VariantDbRow {
+  id: string;
+  product_id: string;
+  label: string;
+  sku_suffix: string | null;
+  price_adjustment: number | string;
+  stock_qty: number;
+  is_active: boolean;
+}
+
+function mapVariantRow(v: VariantDbRow): ProductVariant {
+  return {
+    id: v.id,
+    label: v.label,
+    skuSuffix: v.sku_suffix ?? '',
+    priceAdjustment: Number(v.price_adjustment),
+    stockQty: v.stock_qty,
+  };
+}
+
+function parseSpecs(raw: unknown): ProductSpec[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((r) => ({ label: String((r as ProductSpec)?.label ?? '').trim(), value: String((r as ProductSpec)?.value ?? '').trim() }))
+    .filter((r) => r.label && r.value);
 }
 
 function mapProductRow(p: ProductDbRow): Product {
@@ -300,6 +352,7 @@ function mapProductRow(p: ProductDbRow): Product {
     name: p.name,
     description: p.description,
     images: p.images ?? [],
+    specs: parseSpecs(p.specs),
     costPrice: Number(p.cost_price),
     suggestedPrice: Number(p.suggested_price),
     stockQty: p.stock_qty,
@@ -500,6 +553,7 @@ const SEED_PRODUCTS: Product[] = [
     sku: 'SGS24U-256-BLK',
     isActive: true,
     createdAt: new Date().toISOString(),
+    specs: [],
     reviews: [],
     variants: [],
   },
@@ -519,6 +573,7 @@ const SEED_PRODUCTS: Product[] = [
     sku: 'AADRESS-M',
     isActive: true,
     createdAt: new Date().toISOString(),
+    specs: [],
     reviews: [],
     variants: [],
   },
@@ -564,7 +619,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   hydrate: async () => {
     const uid = get().currentUserId;
     try {
-      const [catsRes, prodsRes, supplierProfilesRes, dropshipperProfilesRes] = await Promise.all([
+      const [catsRes, prodsRes, supplierProfilesRes, dropshipperProfilesRes, catalogRes] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
         supabase
           .from('products')
@@ -576,7 +631,31 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         supabase.from('supplier_profiles').select('*').order('created_at', { ascending: false }),
         // Also public — powers an admin directory of every storefront.
         supabase.from('dropshipper_profiles').select('*').order('created_at', { ascending: false }),
+        // Every published store item (public): the real catalog visitors browse and buy from.
+        supabase
+          .from('dropshipper_products')
+          .select('*, products(*, supplier_profiles(business_name)), dropshipper_profiles(store_name, store_slug)')
+          .eq('is_published', true)
+          .order('created_at', { ascending: false })
+          .limit(500),
       ]);
+
+      // Product options (size, colour...) come from their own table. Fetched on its own so
+      // the site keeps working before the catalog database update has been applied.
+      const variantsByProduct = new Map<string, ProductVariant[]>();
+      try {
+        const vr = await supabase.from('product_variants').select('*').limit(5000);
+        if (!vr.error) {
+          for (const v of (vr.data ?? []) as VariantDbRow[]) {
+            const list = variantsByProduct.get(v.product_id) ?? [];
+            list.push(mapVariantRow(v));
+            variantsByProduct.set(v.product_id, list);
+          }
+        }
+      } catch {
+        /* options unavailable; products still load */
+      }
+      const withVariants = (p: Product): Product => ({ ...p, variants: variantsByProduct.get(p.id) ?? p.variants });
 
       const categories: Category[] = (catsRes.data ?? []).map((c) => ({
         id: c.id,
@@ -586,12 +665,34 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       }));
 
       const products: Product[] = (prodsRes.data ?? []).map((p) =>
-        mapProductRow(p as ProductDbRow),
+        withVariants(mapProductRow(p as ProductDbRow)),
       );
 
-      if (products.length === 0) {
+      if (SHOW_DEMO_DATA && products.length === 0) {
         products.push(...SEED_PRODUCTS);
       }
+
+      type CatalogRow = {
+        id: string; dropshipper_id: string; product_id: string; custom_price: number | string;
+        custom_description: string | null; is_published: boolean; created_at: string;
+        products: ProductDbRow | null;
+        dropshipper_profiles?: { store_name: string | null; store_slug: string | null } | null;
+      };
+      let catalog: DropshipperProduct[] = ((catalogRes.data ?? []) as unknown as CatalogRow[])
+        .filter((d) => d.products && d.products.is_active !== false)
+        .map((d) => ({
+          id: d.id,
+          dropshipperId: d.dropshipper_id,
+          productId: d.product_id,
+          product: withVariants(mapProductRow(d.products as ProductDbRow)),
+          sellingPrice: Number(d.custom_price),
+          customDescription: d.custom_description ?? (d.products as ProductDbRow).description,
+          isPublished: d.is_published,
+          createdAt: d.created_at,
+          storeName: d.dropshipper_profiles?.store_name ?? '',
+          storeSlug: d.dropshipper_profiles?.store_slug ?? '',
+        }));
+      if (SHOW_DEMO_DATA && catalog.length === 0) catalog = SEED_DROPSHIPPER_PRODUCTS;
 
       const supplierProfiles: SupplierProfile[] = (supplierProfilesRes.data ?? []).map((sp) =>
         mapSupplierProfileRow(sp as SupplierProfileDbRow),
@@ -641,7 +742,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
             id: d.id,
             dropshipperId: d.dropshipper_id,
             productId: d.product_id,
-            product: mapProductRow(d.products as ProductDbRow),
+            product: withVariants(mapProductRow(d.products as ProductDbRow)),
             sellingPrice: Number(d.custom_price),
             customDescription: d.custom_description ?? (d.products as ProductDbRow).description,
             isPublished: d.is_published,
@@ -671,14 +772,27 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         users = (usersRes.data ?? []).map((u) => mapUserRow(u as UserDbRow));
       }
 
-      if (dropshipperProducts.length === 0) {
+      if (SHOW_DEMO_DATA && dropshipperProducts.length === 0) {
         dropshipperProducts = SEED_DROPSHIPPER_PRODUCTS;
+      }
+
+      // Saved items (signed-in customers); quietly empty before the catalog database update.
+      let savedIds: string[] = [];
+      if (uid) {
+        try {
+          const sv = await supabase.from('saved_items').select('dropshipper_product_id');
+          if (!sv.error) savedIds = (sv.data ?? []).map((r) => (r as { dropshipper_product_id: string }).dropshipper_product_id);
+        } catch {
+          /* saved items unavailable */
+        }
       }
 
       set({
         categories,
         products,
         dropshipperProducts,
+        catalog,
+        savedIds,
         dropshipperProfile,
         dropshipperProfiles,
         supplierProfiles,
@@ -715,6 +829,8 @@ export const useGlobalStore = create<AppState>((set, get) => ({
   categories: [],
   products: [],
   dropshipperProducts: [],
+  catalog: [],
+  savedIds: [],
   orders: [],
   wallets: {},
   transactions: [],
@@ -819,17 +935,42 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         stock_qty: productData.stockQty,
         sku: productData.sku,
         is_active: productData.isActive,
+        specs: productData.specs ?? [],
       })
       .select('id')
       .single()
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error) {
           set((s) => ({ products: s.products.filter((p) => p.id !== tempId) }));
           console.error('Failed to save product:', error.message);
           return;
         }
+
+        // Save the options (size, colour...) and swap their temporary ids for the real ones.
+        let variants = optimistic.variants;
+        if (variants.length > 0) {
+          const vr = await supabase
+            .from('product_variants')
+            .insert(
+              variants.map((v) => ({
+                product_id: data.id,
+                label: v.label,
+                sku_suffix: v.skuSuffix,
+                price_adjustment: v.priceAdjustment,
+                stock_qty: v.stockQty,
+              })),
+            )
+            .select('id, label');
+          if (vr.error) {
+            console.error('Failed to save product options:', vr.error.message);
+          } else {
+            const idByLabel = new Map((vr.data ?? []).map((r) => [r.label as string, r.id as string]));
+            variants = variants.map((v) => ({ ...v, id: idByLabel.get(v.label) ?? v.id }));
+          }
+        }
+
         set((s) => ({
-          products: s.products.map((p) => (p.id === tempId ? { ...p, id: data.id } : p)),
+          products: s.products.map((p) => (p.id === tempId ? { ...p, id: data.id, variants } : p)),
         }));
       });
   },
@@ -847,6 +988,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       supplierId: uid,
       supplierName,
       createdAt: new Date().toISOString(),
+      specs: [],
       reviews: [],
       variants: [],
     }));
@@ -908,13 +1050,34 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       });
   },
 
-  updateVariantStock: (productId, variantId, newQty) => set((state) => ({
-    products: state.products.map(p =>
-      p.id === productId
-        ? { ...p, variants: p.variants.map(v => v.id === variantId ? { ...v, stockQty: newQty } : v) }
-        : p
-    )
-  })),
+  updateVariantStock: (productId, variantId, newQty) => {
+    const previous = get().products.find((p) => p.id === productId)?.variants.find((v) => v.id === variantId)?.stockQty;
+    set((state) => ({
+      products: state.products.map((p) =>
+        p.id === productId
+          ? { ...p, variants: p.variants.map((v) => (v.id === variantId ? { ...v, stockQty: newQty } : v)) }
+          : p,
+      ),
+    }));
+    // Options that were only just created still carry a temporary id; those are saved with the product.
+    if (variantId.startsWith('variant-')) return;
+    supabase
+      .from('product_variants')
+      .update({ stock_qty: newQty, updated_at: new Date().toISOString() })
+      .eq('id', variantId)
+      .then(({ error }) => {
+        if (error && previous !== undefined) {
+          set((state) => ({
+            products: state.products.map((p) =>
+              p.id === productId
+                ? { ...p, variants: p.variants.map((v) => (v.id === variantId ? { ...v, stockQty: previous } : v)) }
+                : p,
+            ),
+          }));
+          console.error('Failed to update option stock:', error.message);
+        }
+      });
+  },
 
   importProductToStore: (productId, sellingPrice, desc) => {
     const state = get();
@@ -1105,7 +1268,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       p_customer_region: payload.region,
       p_customer_city: payload.city,
       p_customer_ghana_post_gps: payload.ghanaPostGps,
-      p_items: payload.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+      p_items: payload.items.map((i) => ({ productId: i.productId, quantity: i.quantity, variantId: i.variantId })),
       p_notes: payload.notes || null,
     });
 
@@ -1125,12 +1288,14 @@ export const useGlobalStore = create<AppState>((set, get) => ({
 
     // The catalog-wide cart can span multiple dropshippers' stores; split into
     // one create_order call per dropshipper since each order has one owner.
-    const byDropshipper = new Map<string, Array<{ productId: string; quantity: number }>>();
+    const byDropshipper = new Map<string, Array<{ productId: string; quantity: number; variantId?: string }>>();
     for (const cartItem of state.cart) {
-      const dp = state.dropshipperProducts.find((d) => d.id === cartItem.dropshipperProductId);
+      const dp =
+        state.catalog.find((d) => d.id === cartItem.dropshipperProductId) ??
+        state.dropshipperProducts.find((d) => d.id === cartItem.dropshipperProductId);
       if (!dp) continue;
       const items = byDropshipper.get(dp.dropshipperId) ?? [];
-      items.push({ productId: dp.productId, quantity: cartItem.quantity });
+      items.push({ productId: dp.productId, quantity: cartItem.quantity, variantId: cartItem.variantId });
       byDropshipper.set(dp.dropshipperId, items);
     }
 
@@ -1157,6 +1322,25 @@ export const useGlobalStore = create<AppState>((set, get) => ({
     set({ cart: [] });
     void get().hydrate();
     return { success: true, orderNumber: firstOrderNumber };
+  },
+
+  toggleSaved: async (dropshipperProductId) => {
+    const uid = get().currentUserId;
+    if (!uid) return { ok: false, error: 'Sign in to save items for later.' };
+    const wasSaved = get().savedIds.includes(dropshipperProductId);
+    set((s) => ({
+      savedIds: wasSaved ? s.savedIds.filter((x) => x !== dropshipperProductId) : [...s.savedIds, dropshipperProductId],
+    }));
+    const { error } = wasSaved
+      ? await supabase.from('saved_items').delete().eq('user_id', uid).eq('dropshipper_product_id', dropshipperProductId)
+      : await supabase.from('saved_items').insert({ user_id: uid, dropshipper_product_id: dropshipperProductId });
+    if (error) {
+      set((s) => ({
+        savedIds: wasSaved ? [...s.savedIds, dropshipperProductId] : s.savedIds.filter((x) => x !== dropshipperProductId),
+      }));
+      return { ok: false, error: error.message.includes('200') ? error.message : 'Could not update your saved items. Please try again.' };
+    }
+    return { ok: true, saved: !wasSaved };
   },
 
   // Fulfill orders

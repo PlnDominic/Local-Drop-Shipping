@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useGlobalStore } from '../store/globalStore';
 import { useAuth } from '../lib/auth/AuthProvider';
+import { buildHeaderCategories, type HeaderCategory as RealHeaderCategory } from '../lib/categories';
 
 export interface HeaderCategory {
   id: string;
@@ -42,13 +43,13 @@ const NAV_LINKS = [
   { label: 'New Arrivals', href: '/marketplace' },
   { label: 'Supplier Portal', href: '/supplier' },
   { label: 'Start Dropshipping', href: '/dropshipper' },
-  { label: 'Wishlist', href: '/wishlist' },
+  { label: 'Join Waitlist', href: '/' },
   { label: 'API Docs', href: '/docs' },
 ];
 
 interface SiteHeaderProps {
   /** Categories shown in the search-bar select and the "All Categories" dropdown. */
-  categories?: HeaderCategory[];
+  categories?: Array<HeaderCategory | RealHeaderCategory>;
   /** Controlled active category (marketplace page owns this state). Uncontrolled elsewhere. */
   activeCategory?: string;
   onCategoryChange?: (id: string) => void;
@@ -66,7 +67,7 @@ interface SiteHeaderProps {
  * Used identically across the marketplace, dropshipper, supplier, admin, and docs pages.
  */
 export const SiteHeader: React.FC<SiteHeaderProps> = ({
-  categories = DEFAULT_HEADER_CATEGORIES,
+  categories: categoriesProp,
   activeCategory: controlledCategory,
   onCategoryChange,
   query: controlledQuery,
@@ -74,7 +75,9 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
   onSearchSubmit,
   onCartClick,
 }) => {
-  const { cart } = useGlobalStore();
+  const { cart, savedIds, categories: storeCategories } = useGlobalStore();
+  // Real categories from the database (ids match products); the built-in list is only a fallback.
+  const categories = categoriesProp ?? (storeCategories.length ? buildHeaderCategories(storeCategories) : DEFAULT_HEADER_CATEGORIES);
   const { profile, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -196,12 +199,17 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
           {/* Icons */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link
-              href="/wishlist"
-              aria-label="Wishlist"
-              className={`flex flex-col items-center gap-0.5 p-2 hover:text-[#f04438] transition-colors ${pathname === '/' || pathname === '/wishlist' ? 'text-[#f04438]' : 'text-[#555]'}`}
+              href="/saved"
+              aria-label="Saved items"
+              className={`relative flex flex-col items-center gap-0.5 p-2 hover:text-[#f04438] transition-colors ${pathname === '/saved' ? 'text-[#f04438]' : 'text-[#555]'}`}
             >
               <Heart size={20} />
-              <span className="hidden sm:block text-[9px] font-semibold">Wishlist</span>
+              <span className="hidden sm:block text-[9px] font-semibold">Saved</span>
+              {savedIds.length > 0 && (
+                <span className="absolute right-1 top-1 grid h-[16px] min-w-[16px] place-items-center rounded-full bg-[#f04438] px-1 text-[9px] font-black text-white">
+                  {savedIds.length}
+                </span>
+              )}
             </Link>
 
             <div className="relative">
@@ -288,7 +296,7 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
               </button>
             ) : (
               <Link
-                href="/"
+                href="/marketplace?cart=1"
                 aria-label="Cart"
                 className="relative flex flex-col items-center gap-0.5 p-2 text-[#555] hover:text-[#151515] transition-colors"
               >

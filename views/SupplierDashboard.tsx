@@ -32,6 +32,9 @@ type DraftVariant = { label: string; skuSuffix: string; priceAdjustment: string;
 
 const emptyDraftVariant = (): DraftVariant => ({ label: '', skuSuffix: '', priceAdjustment: '', stockQty: '' });
 
+// Working shape for a specification row (e.g. Material: Cotton).
+type DraftSpec = { label: string; value: string };
+
 const BULK_IMPORT_TEMPLATE =
   'name,description,category,costPrice,suggestedPrice,stockQty,sku,imageUrl\n' +
   'Leather Sandals,Handmade leather sandals,Fashion,80,120,40,LDR-SAN,https://example.com/sandal.jpg\n';
@@ -104,6 +107,7 @@ export const SupplierDashboard: React.FC = () => {
   const [stockQty, setStockQty] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [draftSpecs, setDraftSpecs] = useState<DraftSpec[]>([]);
   const [sku, setSku] = useState('');
   const [draftVariants, setDraftVariants] = useState<DraftVariant[]>([]);
 
@@ -137,7 +141,13 @@ export const SupplierDashboard: React.FC = () => {
       categoryId,
       name,
       description,
-      images: imageUrl ? [imageUrl] : [],
+      // One photo URL per line; the first is the main image and the rest form the product gallery.
+      images: imageUrl
+        .split(/[\n,]+/)
+        .map((u) => u.trim())
+        .filter((u) => /^https?:\/\//i.test(u))
+        .slice(0, 8),
+      specs: draftSpecs.filter((s) => s.label.trim() && s.value.trim()).map((s) => ({ label: s.label.trim(), value: s.value.trim() })),
       costPrice: parseFloat(costPrice) || 0,
       suggestedPrice: parseFloat(suggestedPrice) || 0,
       stockQty: parseInt(stockQty) || 0,
@@ -154,6 +164,7 @@ export const SupplierDashboard: React.FC = () => {
     setImageUrl('');
     setSku('');
     setDraftVariants([]);
+    setDraftSpecs([]);
     setActiveTab('products');
   };
 
@@ -503,8 +514,8 @@ export const SupplierDashboard: React.FC = () => {
                   <input type="text" placeholder="e.g. LDR-SAN" value={sku} onChange={(e) => setSku(e.target.value)} className={`${inputClass} uppercase font-bold`} />
                 </div>
                 <div>
-                  <label className={labelClass}>Photo URL</label>
-                  <input type="text" placeholder="https://..." value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className={inputClass} />
+                  <label className={labelClass}>Photo URLs (one per line, up to 8)</label>
+                  <textarea rows={3} placeholder={'https://... (main photo)\nhttps://... (more angles)'} value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="w-full rounded border border-gray-200 px-3 py-2 text-[12px] focus:outline-none focus:border-[#f04438]" />
                 </div>
                 <div className="flex-1">
                   <label className={labelClass}>Description</label>
@@ -566,6 +577,41 @@ export const SupplierDashboard: React.FC = () => {
                           onClick={() => removeDraftVariantRow(idx)}
                           className="h-9 w-9 grid place-items-center rounded border border-gray-200 text-gray-400 hover:text-[#f04438] hover:border-[#f04438]"
                         >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Specifications ── */}
+              <div className="md:col-span-2 border-t border-gray-100 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-[12px] font-black text-[#151515]">Specifications (optional)</p>
+                    <p className="text-[10px] text-[#888]">Facts buyers look for: material, size, weight, warranty. Shown in a table on the product page.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDraftSpecs((r) => [...r, { label: '', value: '' }])}
+                    className="h-8 rounded border border-gray-200 px-3 text-[11px] font-bold text-[#151515] hover:bg-gray-50 flex items-center gap-1"
+                  >
+                    <Plus size={13} /> Add specification
+                  </button>
+                </div>
+                {draftSpecs.length > 0 && (
+                  <div className="space-y-2">
+                    {draftSpecs.map((row, idx) => (
+                      <div key={idx} className="grid grid-cols-[1fr_2fr_36px] gap-2 items-center">
+                        <input type="text" placeholder="e.g. Material" value={row.label} maxLength={40}
+                          onChange={(e) => setDraftSpecs((r) => r.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))}
+                          className={`${inputClass} h-9`} />
+                        <input type="text" placeholder="e.g. 100% cotton" value={row.value} maxLength={120}
+                          onChange={(e) => setDraftSpecs((r) => r.map((x, i) => (i === idx ? { ...x, value: e.target.value } : x)))}
+                          className={`${inputClass} h-9`} />
+                        <button type="button" onClick={() => setDraftSpecs((r) => r.filter((_, i) => i !== idx))}
+                          className="h-9 w-9 grid place-items-center rounded border border-gray-200 text-gray-400 hover:text-[#f04438] hover:border-[#f04438]">
                           <Trash2 size={14} />
                         </button>
                       </div>

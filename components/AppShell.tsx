@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
 import { Marketplace } from '../views/Marketplace';
 import { DropshipperDashboard } from '../views/DropshipperDashboard';
@@ -26,7 +26,7 @@ const AppShell: React.FC = () => {
   const renderDesktopContent = () => {
     switch (activeRole) {
       case 'customer':
-        return <Marketplace />;
+        return <Suspense fallback={null}><Marketplace /></Suspense>;
       case 'dropshipper':
         return <DropshipperDashboard />;
       case 'supplier':
@@ -36,7 +36,7 @@ const AppShell: React.FC = () => {
       case 'developer':
         return <DiagramsAndDocs />;
       default:
-        return <Marketplace />;
+        return <Suspense fallback={null}><Marketplace /></Suspense>;
     }
   };
 
@@ -44,9 +44,9 @@ const AppShell: React.FC = () => {
   const renderMobileContent = () => {
     switch (mobileTab) {
       case 'home':
-        return <Marketplace />;
+        return <Suspense fallback={null}><Marketplace /></Suspense>;
       case 'shop':
-        return <Marketplace />;
+        return <Suspense fallback={null}><Marketplace /></Suspense>;
       case 'dashboard':
         // Display appropriate dashboard depending on active simulator role
         if (activeRole === 'supplier') {

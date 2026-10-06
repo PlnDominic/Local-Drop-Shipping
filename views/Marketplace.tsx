@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,7 +9,6 @@ import {
   CreditCard,
   Gift,
   Heart,
-  LayoutGrid,
   MapPin,
   Minus,
   Package,
@@ -28,11 +27,13 @@ import Link from 'next/link';
 import { DeliveryFields } from '../components/checkout/DeliveryFields';
 import { SupplierName } from '../components/SupplierName';
 import { isValidGhanaPostGps, normalizeGhanaPostGps, type DeliveryQuote } from '../lib/checkout';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { SaveButton } from '../components/SaveButton';
+import { buildIndex, runSearch } from '../lib/search';
+import { buildHeaderCategories } from '../lib/categories';
 import { useGlobalStore } from '../store/globalStore';
 import type { DropshipperProduct, ProductReview } from '../store/globalStore';
 import { useToast } from '../components/Toast';
-import { useAuth } from '../lib/auth/AuthProvider';
 import { SiteHeader } from '../components/SiteHeader';
 
 const heroImage =
@@ -42,7 +43,16 @@ const heroBanner2 =
 const heroBanner3 =
   'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80';
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 12;
+
+type SortKey = 'relevance' | 'newest' | 'price_asc' | 'price_desc' | 'rating';
+const SORTS: { id: SortKey; label: string }[] = [
+  { id: 'relevance', label: 'Best match' },
+  { id: 'newest', label: 'Newest' },
+  { id: 'price_asc', label: 'Price: low to high' },
+  { id: 'price_desc', label: 'Price: high to low' },
+  { id: 'rating', label: 'Top rated' },
+];
 
 const formatMoney = (amount: number) =>
   `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
@@ -90,233 +100,38 @@ const SkeletonCard: React.FC = () => (
   </div>
 );
 
-const ProductModal: React.FC<{
-  product: DropshipperProduct;
-  onClose: () => void;
-  onAddToCart: (id: string, variant?: { id: string; label: string }) => void;
-  onBuyNow: (id: string, variant?: { id: string; label: string }) => void;
-  onSubmitReview: (productId: string, review: { author: string; rating: number; comment: string }) => void;
-  currentUserName?: string;
-}> = ({ product, onClose, onAddToCart, onBuyNow, onSubmitReview, currentUserName }) => {
-  const reviews = product.product.reviews || [];
-  const avgRating = computeAvgRating(reviews);
-  const variants = product.product.variants || [];
-  const [selectedVariantId, setSelectedVariantId] = useState<string>(variants[0]?.id ?? '');
-  const selectedVariant = variants.find((v) => v.id === selectedVariantId);
-
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewComment, setReviewComment] = useState('');
-  const [reviewAuthor, setReviewAuthor] = useState(currentUserName ?? '');
-  const [reviewSubmitted, setReviewSubmitted] = useState(false);
-
-  const handleSubmitReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewComment.trim()) return;
-    onSubmitReview(product.product.id, {
-      author: reviewAuthor.trim() || 'Anonymous',
-      rating: reviewRating,
-      comment: reviewComment.trim(),
-    });
-    setReviewComment('');
-    setReviewSubmitted(true);
-  };
-
-  const canAddToCart = variants.length === 0 || !!selectedVariant;
-  const variantForCart = selectedVariant ? { id: selectedVariant.id, label: selectedVariant.label } : undefined;
-
-  return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="relative w-full max-w-2xl bg-white shadow-2xl rounded-lg max-h-[90vh] overflow-y-auto">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-white hover:bg-gray-50"
-        >
-          <X size={18} />
-        </button>
-
-        <div className="grid md:grid-cols-2">
-          <div className="bg-[#f7f7f7] aspect-square flex items-center justify-center p-8 rounded-tl-lg rounded-bl-lg">
-            <img
-              src={product.product.images[0]}
-              alt={product.product.name}
-              className="h-full w-full object-contain mix-blend-multiply"
-            />
-          </div>
-          <div className="p-6 flex flex-col gap-4">
-            <div>
-              <span className="inline-block bg-[#f04438]/10 text-[#f04438] text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded mb-2">
-                {getCategoryLabel(product.product.categoryId)}
-              </span>
-              <h2 className="text-[20px] font-black leading-tight text-[#151515]">
-                {product.product.name}
-              </h2>
-              <p className="mt-1 text-xs text-[#777]"><SupplierName supplierId={product.product.supplierId} name={product.product.supplierName} /></p>
-            </div>
-            <p className="text-sm leading-relaxed text-[#444]">{product.customDescription}</p>
-            <div className="flex items-center gap-3">
-              <StarDisplay rating={avgRating} size={16} />
-              <span className="text-xs font-bold text-[#777]">
-                {avgRating.toFixed(1)} ({reviews.length} review{reviews.length !== 1 ? 's' : ''})
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <strong className="text-2xl font-black text-[#f04438]">
-                {formatMoney(product.sellingPrice + (selectedVariant?.priceAdjustment ?? 0))}
-              </strong>
-              <span className="text-xs text-[#777]">
-                {selectedVariant ? selectedVariant.stockQty : product.product.stockQty} in stock
-              </span>
-            </div>
-
-            {variants.length > 0 && (
-              <div>
-                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-[#777]">
-                  Options
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {variants.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => setSelectedVariantId(v.id)}
-                      disabled={v.stockQty <= 0}
-                      className={`h-9 rounded border px-3 text-[11px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                        selectedVariantId === v.id
-                          ? 'border-[#f04438] bg-[#f04438]/10 text-[#f04438]'
-                          : 'border-gray-200 text-[#555] hover:border-gray-300'
-                      }`}
-                    >
-                      {v.label}{v.stockQty <= 0 ? ' (out of stock)' : ''}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={!canAddToCart}
-                onClick={() => { onAddToCart(product.id, variantForCart); onClose(); }}
-                className="h-11 rounded border border-[#151515] bg-white px-3 text-[11px] font-black text-[#151515] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Add to Cart
-              </button>
-              <button
-                type="button"
-                disabled={!canAddToCart}
-                onClick={() => { onBuyNow(product.id, variantForCart); onClose(); }}
-                className="h-11 rounded border border-[#f04438] bg-[#f04438] px-3 text-[11px] font-black text-white transition-colors hover:bg-[#c0392b] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Buy Now
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-[#ededed] p-6">
-          <h3 className="mb-4 text-[15px] font-black text-[#151515]">Customer Reviews</h3>
-
-          {reviews.length > 0 && (
-            <div className="mb-6 space-y-4">
-              {reviews.map((review) => (
-                <div key={review.id} className="border-b border-[#f0f0f0] pb-4 last:border-0 last:pb-0">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <StarDisplay rating={review.rating} size={12} />
-                      <span className="text-[12px] font-black text-[#151515]">{review.author}</span>
-                    </div>
-                    <span className="text-[10px] text-[#aaa]">{new Date(review.date).toLocaleDateString()}</span>
-                  </div>
-                  <p className="mt-1.5 text-[12px] leading-relaxed text-[#555]">{review.comment}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {reviewSubmitted ? (
-            <p className="rounded bg-green-50 px-3 py-2.5 text-[12px] font-bold text-green-700">
-              Thanks — your review has been posted.
-            </p>
-          ) : (
-            <form onSubmit={handleSubmitReview} className="space-y-3 rounded border border-gray-100 bg-[#fafafa] p-4">
-              <p className="text-[12px] font-black text-[#151515]">Write a review</p>
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setReviewRating(n)}
-                    aria-label={`Rate ${n} star${n !== 1 ? 's' : ''}`}
-                    className="p-0.5"
-                  >
-                    <Star size={20} fill={n <= reviewRating ? '#f5a524' : 'none'} stroke={n <= reviewRating ? '#f5a524' : '#ccc'} strokeWidth={1.5} />
-                  </button>
-                ))}
-              </div>
-              <input
-                type="text"
-                placeholder="Your name (optional)"
-                value={reviewAuthor}
-                onChange={(e) => setReviewAuthor(e.target.value)}
-                className="w-full h-9 rounded border border-gray-200 px-3 text-[12px] focus:outline-none focus:border-[#f04438]"
-              />
-              <textarea
-                required
-                rows={3}
-                placeholder="Share your experience with this product…"
-                value={reviewComment}
-                onChange={(e) => setReviewComment(e.target.value)}
-                className="w-full rounded border border-gray-200 px-3 py-2 text-[12px] focus:outline-none focus:border-[#f04438]"
-              />
-              <button
-                type="submit"
-                className="h-9 rounded bg-[#151515] px-4 text-[11px] font-black text-white transition-colors hover:bg-[#f04438]"
-              >
-                Submit Review
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const ProductCard: React.FC<{
   product: DropshipperProduct;
   onAddToCart: (id: string) => void;
-  onBuyNow: (id: string) => void;
-  onOpenDetail: (product: DropshipperProduct) => void;
   horizontal?: boolean;
-}> = ({ product, onAddToCart, onBuyNow: _onBuyNow, onOpenDetail, horizontal = false }) => {
+}> = ({ product, onAddToCart, horizontal = false }) => {
   const reviews = product.product.reviews || [];
   const avgRating = computeAvgRating(reviews);
+  const href = `/product/${product.id}`;
+  const image = product.product.images[0];
+  const categoryName =
+    useGlobalStore((s) => s.categories.find((c) => c.id === product.product.categoryId)?.name) ??
+    getCategoryLabel(product.product.categoryId);
+  const hasOptions = product.product.variants.length > 0;
   const discount = product.product.suggestedPrice > product.sellingPrice
     ? Math.round(((product.product.suggestedPrice - product.sellingPrice) / product.product.suggestedPrice) * 100)
     : 0;
 
+  const picture = image ? (
+    <img src={image} alt={product.product.name} loading="lazy" className="h-full w-full object-contain p-1 mix-blend-multiply" />
+  ) : (
+    <Package size={22} className="text-gray-300" />
+  );
+
   if (horizontal) {
     return (
       <article className="flex gap-3 p-3 border border-gray-100 rounded bg-white hover:shadow-sm transition-shadow">
-        <div
-          className="w-16 h-16 flex-shrink-0 bg-[#f7f7f7] rounded cursor-pointer flex items-center justify-center"
-          onClick={() => onOpenDetail(product)}
-        >
-          <img src={product.product.images[0]} alt={product.product.name} className="w-full h-full object-contain p-1 mix-blend-multiply" />
-        </div>
+        <Link href={href} className="w-16 h-16 flex-shrink-0 bg-[#f7f7f7] rounded flex items-center justify-center overflow-hidden">
+          {picture}
+        </Link>
         <div className="min-w-0 flex-1">
-          <h4
-            className="line-clamp-2 text-xs font-bold text-[#151515] cursor-pointer hover:text-[#f04438] leading-tight"
-            onClick={() => onOpenDetail(product)}
-          >
-            {product.product.name}
+          <h4 className="line-clamp-2 text-xs font-bold text-[#151515] hover:text-[#f04438] leading-tight">
+            <Link href={href}>{product.product.name}</Link>
           </h4>
           <StarDisplay rating={avgRating} size={10} />
           <p className="mt-1 text-sm font-black text-[#f04438]">{formatMoney(product.sellingPrice)}</p>
@@ -327,60 +142,65 @@ const ProductCard: React.FC<{
 
   return (
     <article className="group min-w-0 bg-white border border-gray-100 rounded hover:shadow-md transition-shadow">
-      <div
-        className="relative overflow-hidden bg-[#f7f7f7] aspect-square cursor-pointer rounded-t"
-        onClick={() => onOpenDetail(product)}
-      >
+      <div className="relative overflow-hidden bg-[#f7f7f7] aspect-square rounded-t">
         {discount > 0 && (
           <span className="absolute left-2 top-2 z-10 bg-[#f04438] px-2 py-0.5 text-[10px] font-black text-white rounded">
             -{discount}%
           </span>
         )}
-        <button
-          type="button"
-          aria-label="Wishlist"
-          onClick={(e) => { e.stopPropagation(); }}
-          className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-white shadow opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <Heart size={13} className="text-gray-400 hover:text-[#f04438]" />
-        </button>
-        <img
-          src={product.product.images[0]}
-          alt={product.product.name}
-          className="h-full w-full object-contain p-4 mix-blend-multiply transition-transform duration-500 group-hover:scale-105"
-        />
+        <SaveButton dropshipperProductId={product.id} className="absolute right-2 top-2 z-10" />
+        <Link href={href} className="flex h-full w-full items-center justify-center" aria-label={product.product.name}>
+          {image ? (
+                    <img
+              src={image}
+              alt={product.product.name}
+              loading="lazy"
+              className="h-full w-full object-contain p-4 mix-blend-multiply transition-transform duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <Package size={36} className="text-gray-300" />
+          )}
+        </Link>
       </div>
       <div className="p-3">
-        <span className="text-[9px] font-bold text-[#777] uppercase tracking-wider">
-          {getCategoryLabel(product.product.categoryId)}
-        </span>
-        <h3
-          className="mt-0.5 line-clamp-2 text-[13px] font-bold leading-tight text-[#151515] cursor-pointer hover:text-[#f04438] transition-colors"
-          onClick={() => onOpenDetail(product)}
-        >
-          {product.product.name}
+        <span className="text-[9px] font-bold text-[#777] uppercase tracking-wider">{categoryName}</span>
+        <h3 className="mt-0.5 line-clamp-2 text-[13px] font-bold leading-tight text-[#151515] hover:text-[#f04438] transition-colors">
+          <Link href={href}>{product.product.name}</Link>
         </h3>
-        <div className="mt-1 flex items-center gap-1">
-          <StarDisplay rating={avgRating} size={10} />
-          <span className="text-[10px] text-[#999]">({reviews.length})</span>
-        </div>
+        <p className="mt-1 text-[10px] text-[#999] truncate">
+          <SupplierName supplierId={product.product.supplierId} name={product.product.supplierName} />
+        </p>
+        {reviews.length > 0 && (
+          <div className="mt-1 flex items-center gap-1">
+            <StarDisplay rating={avgRating} size={10} />
+            <span className="text-[10px] text-[#999]">({reviews.length})</span>
+          </div>
+        )}
         <div className="mt-2 flex items-center gap-2">
-          <span className="text-[15px] font-black text-[#f04438]">{formatMoney(product.sellingPrice)}</span>
+          <span className="text-[15px] font-black text-[#f04438]">
+            {hasOptions && <span className="mr-1 text-[10px] font-bold text-[#999]">From</span>}
+            {formatMoney(product.sellingPrice + (hasOptions ? Math.min(0, ...product.product.variants.map((v) => v.priceAdjustment)) : 0))}
+          </span>
           {discount > 0 && (
             <span className="text-[11px] text-[#bbb] line-through">{formatMoney(product.product.suggestedPrice)}</span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            // Variants need to be picked in the detail modal before adding to cart.
-            if (product.product.variants.length > 0) onOpenDetail(product);
-            else onAddToCart(product.id);
-          }}
-          className="mt-3 w-full h-9 rounded bg-[#151515] text-[11px] font-black text-white transition-colors hover:bg-[#f04438]"
-        >
-          {product.product.variants.length > 0 ? 'Select Options' : 'Add to Cart'}
-        </button>
+        {hasOptions ? (
+          <Link
+            href={href}
+            className="mt-3 flex w-full h-9 items-center justify-center rounded bg-[#151515] text-[11px] font-black text-white transition-colors hover:bg-[#f04438]"
+          >
+            Select Options
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onAddToCart(product.id)}
+            className="mt-3 w-full h-9 rounded bg-[#151515] text-[11px] font-black text-white transition-colors hover:bg-[#f04438]"
+          >
+            Add to Cart
+          </button>
+        )}
       </div>
     </article>
   );
@@ -388,7 +208,9 @@ const ProductCard: React.FC<{
 
 export const Marketplace: React.FC = () => {
   const {
-    dropshipperProducts,
+    catalog,
+    categories: storeCategories,
+    supplierProfiles,
     cart,
     addToCart,
     removeFromCart,
@@ -397,24 +219,31 @@ export const Marketplace: React.FC = () => {
     appliedPromo,
     applyPromoCode,
     clearPromo,
-    addProductReview,
     currentUserId,
   } = useGlobalStore();
 
   const { showToast } = useToast();
   const router = useRouter();
-  const { profile } = useAuth();
 
-  const [query, setQuery] = useState('');
+  const searchParams = useSearchParams();
+  const categories = useMemo(() => buildHeaderCategories(storeCategories), [storeCategories]);
+
+  // Search and filter choices live in the URL so a search can be shared, bookmarked and survive a refresh.
+  const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [activeTab, setActiveTab] = useState<'featured' | 'bestseller' | 'latest'>('featured');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [minRating, setMinRating] = useState(0);
-  const [inStockOnly, setInStockOnly] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
+  const [sort, setSort] = useState<SortKey>(
+    (SORTS.some((x) => x.id === searchParams.get('sort')) ? searchParams.get('sort') : 'relevance') as SortKey,
+  );
+  const [currentPage, setCurrentPage] = useState(Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1));
+  const [minPrice, setMinPrice] = useState(searchParams.get('min') ?? '');
+  const [maxPrice, setMaxPrice] = useState(searchParams.get('max') ?? '');
+  const [minRating, setMinRating] = useState(Math.min(5, Math.max(0, parseInt(searchParams.get('rating') ?? '0', 10) || 0)));
+  const [inStockOnly, setInStockOnly] = useState(searchParams.get('instock') === '1');
+  const [verifiedOnly, setVerifiedOnly] = useState(searchParams.get('verified') === '1');
+  const [filtersOpen, setFiltersOpen] = useState(
+    ['min', 'max', 'rating', 'instock', 'verified'].some((k) => searchParams.has(k)),
+  );
+  const [cartOpen, setCartOpen] = useState(searchParams.get('cart') === '1');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
@@ -424,28 +253,71 @@ export const Marketplace: React.FC = () => {
   const [deliveryStatus, setDeliveryStatus] = useState<string>('idle');
   const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [detailProduct, setDetailProduct] = useState<DropshipperProduct | null>(null);
   const [promoInput, setPromoInput] = useState('');
   const [promoError, setPromoError] = useState('');
 
   useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 1000);
+    const t = setTimeout(() => setIsLoading(false), 600);
     return () => clearTimeout(t);
   }, []);
 
+  // ?category= accepts a category's name-slug or id; resolve it once the categories have loaded.
+  const categoryFromUrl = useRef(false);
   useEffect(() => {
+    if (categoryFromUrl.current) return;
+    const wanted = searchParams.get('category');
+    if (!wanted) { categoryFromUrl.current = true; return; }
+    const hit = categories.find((c) => c.slug === wanted || c.id === wanted);
+    if (hit) { setActiveCategory(hit.id); categoryFromUrl.current = true; }
+  }, [categories, searchParams]);
+
+  // Any change to the search or filters returns to page 1 (but not on first load, which may carry ?page=).
+  const skipPageReset = useRef(true);
+  useEffect(() => {
+    if (skipPageReset.current) { skipPageReset.current = false; return; }
     setCurrentPage(1);
-  }, [activeCategory, activeTab, query, minPrice, maxPrice, minRating, inStockOnly]);
+  }, [activeCategory, sort, query, minPrice, maxPrice, minRating, inStockOnly, verifiedOnly]);
 
-  const publishedProducts = useMemo(
-    () => dropshipperProducts.filter((item) => item.isPublished),
-    [dropshipperProducts]
+  // Mirror the choices into the address bar.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const params = new URLSearchParams();
+      if (query.trim()) params.set('q', query.trim());
+      const cat = categories.find((c) => c.id === activeCategory);
+      if (cat && cat.id !== 'all') params.set('category', cat.slug);
+      if (sort !== 'relevance') params.set('sort', sort);
+      if (minPrice.trim()) params.set('min', minPrice.trim());
+      if (maxPrice.trim()) params.set('max', maxPrice.trim());
+      if (minRating > 0) params.set('rating', String(minRating));
+      if (inStockOnly) params.set('instock', '1');
+      if (verifiedOnly) params.set('verified', '1');
+      if (currentPage > 1) params.set('page', String(currentPage));
+      const qs = params.toString();
+      router.replace(qs ? `/marketplace?${qs}` : '/marketplace', { scroll: false });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [query, activeCategory, sort, minPrice, maxPrice, minRating, inStockOnly, verifiedOnly, currentPage, categories, router]);
+
+  const publishedProducts = useMemo(() => catalog.filter((item) => item.isPublished), [catalog]);
+  const catalogProducts = publishedProducts;
+  const verifiedSupplierIds = useMemo(
+    () => new Set(supplierProfiles.filter((sp) => sp.isVerified).map((sp) => sp.id)),
+    [supplierProfiles],
   );
 
-  const catalogProducts = useMemo(
-    () => [...publishedProducts, ...publishedProducts.slice().reverse(), ...publishedProducts.slice(0, 1)],
-    [publishedProducts]
+  const searchIndex = useMemo(
+    () =>
+      buildIndex(catalogProducts, (item) => ({
+        name: item.product.name,
+        sku: item.product.sku,
+        category: categories.find((c) => c.id === item.product.categoryId)?.label,
+        supplier: item.product.supplierName,
+        store: item.storeName,
+        description: item.customDescription,
+      })),
+    [catalogProducts, categories],
   );
+  const searched = useMemo(() => runSearch(searchIndex, query), [searchIndex, query]);
 
   const minPriceNum = minPrice.trim() === '' ? null : parseFloat(minPrice);
   const maxPriceNum = maxPrice.trim() === '' ? null : parseFloat(maxPrice);
@@ -453,17 +325,12 @@ export const Marketplace: React.FC = () => {
     (minPriceNum !== null && !isNaN(minPriceNum) ? 1 : 0) +
     (maxPriceNum !== null && !isNaN(maxPriceNum) ? 1 : 0) +
     (minRating > 0 ? 1 : 0) +
-    (inStockOnly ? 1 : 0);
+    (inStockOnly ? 1 : 0) +
+    (verifiedOnly ? 1 : 0);
 
   const filteredProducts = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let result = catalogProducts.filter((item) => {
+    const result = searched.results.filter((item) => {
       const matchesCategory = activeCategory === 'all' || item.product.categoryId === activeCategory;
-      const matchesSearch =
-        q.length === 0 ||
-        item.product.name.toLowerCase().includes(q) ||
-        item.customDescription.toLowerCase().includes(q) ||
-        item.product.supplierName.toLowerCase().includes(q);
       const matchesMinPrice = minPriceNum === null || isNaN(minPriceNum) || item.sellingPrice >= minPriceNum;
       const matchesMaxPrice = maxPriceNum === null || isNaN(maxPriceNum) || item.sellingPrice <= maxPriceNum;
       const matchesRating = minRating === 0 || computeAvgRating(item.product.reviews || []) >= minRating;
@@ -471,26 +338,29 @@ export const Marketplace: React.FC = () => {
         ? item.product.variants.some((v) => v.stockQty > 0)
         : item.product.stockQty > 0;
       const matchesStock = !inStockOnly || stockAvailable;
-      return matchesCategory && matchesSearch && matchesMinPrice && matchesMaxPrice && matchesRating && matchesStock;
+      const matchesVerified = !verifiedOnly || verifiedSupplierIds.has(item.product.supplierId);
+      return matchesCategory && matchesMinPrice && matchesMaxPrice && matchesRating && matchesStock && matchesVerified;
     });
 
-    if (activeTab === 'bestseller') {
-      result = [...result].sort((a, b) => b.sellingPrice - a.sellingPrice);
-    } else if (activeTab === 'latest') {
-      result = [...result].reverse();
+    const when = (i: DropshipperProduct) => new Date(i.createdAt ?? i.product.createdAt).getTime() || 0;
+    switch (sort) {
+      case 'newest': return [...result].sort((a, b) => when(b) - when(a));
+      case 'price_asc': return [...result].sort((a, b) => a.sellingPrice - b.sellingPrice);
+      case 'price_desc': return [...result].sort((a, b) => b.sellingPrice - a.sellingPrice);
+      case 'rating': return [...result].sort((a, b) => computeAvgRating(b.product.reviews || []) - computeAvgRating(a.product.reviews || []));
+      default: return result; // best match when searching, otherwise newest first (database order)
     }
-
-    return result;
-  }, [activeCategory, catalogProducts, query, activeTab, minPriceNum, maxPriceNum, minRating, inStockOnly]);
+  }, [searched, activeCategory, sort, minPriceNum, maxPriceNum, minRating, inStockOnly, verifiedOnly, verifiedSupplierIds]);
 
   const clearAllFilters = () => {
     setActiveCategory('all');
     setQuery('');
-    setActiveTab('featured');
+    setSort('relevance');
     setMinPrice('');
     setMaxPrice('');
     setMinRating(0);
     setInStockOnly(false);
+    setVerifiedOnly(false);
   };
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
@@ -539,11 +409,6 @@ export const Marketplace: React.FC = () => {
     addToCart(id, variant);
     setCartOpen(true);
     showToast('Added to cart!', 'success');
-  };
-  const handleBuyNow = (id: string, variant?: { id: string; label: string }) => {
-    addToCart(id, variant);
-    setCartOpen(true);
-    setCheckoutOpen(true);
   };
 
   const handleApplyPromo = () => {
@@ -608,16 +473,6 @@ export const Marketplace: React.FC = () => {
     setEmailSubmitted(true);
     setTimeout(() => setEmailSubmitted(false), 3000);
   };
-
-  const categories = [
-    { id: 'all', label: 'All Categories', icon: LayoutGrid },
-    { id: 'cat-1', label: 'Electronics', icon: Zap },
-    { id: 'cat-2', label: 'Fashion', icon: Heart },
-    { id: 'cat-3', label: 'Beauty', icon: Star },
-    { id: 'cat-4', label: 'Home & Living', icon: Package },
-    { id: 'cat-5', label: 'Health', icon: Gift },
-    { id: 'cat-6', label: 'Food & Grocery', icon: Tag },
-  ];
 
   return (
     <main className="min-h-screen bg-[#f4f4f4] text-[#1c1c1c]">
@@ -688,8 +543,6 @@ export const Marketplace: React.FC = () => {
                     key={`sale-${product.id}-${i}`}
                     product={product}
                     onAddToCart={handleAddToCart}
-                    onBuyNow={handleBuyNow}
-                    onOpenDetail={setDetailProduct}
                     horizontal
                   />
                 ))}
@@ -798,18 +651,19 @@ export const Marketplace: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-                {(['featured', 'bestseller', 'latest'] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveTab(tab)}
-                    className={`h-8 flex-shrink-0 rounded px-3 sm:px-4 text-[11px] font-black transition-colors ${activeTab === tab ? 'bg-[#f04438] text-white' : 'bg-gray-100 text-[#555] hover:bg-gray-200'}`}
-                  >
-                    {tab === 'featured' ? 'Featured' : tab === 'bestseller' ? 'Best Seller' : 'Latest'}
-                  </button>
-                ))}
-              </div>
+              <label className="flex items-center gap-2 text-[11px] font-black text-[#555]">
+                <span className="hidden sm:inline">Sort by</span>
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as SortKey)}
+                  aria-label="Sort products"
+                  className="h-8 rounded border border-gray-200 bg-white px-2 text-[11px] font-bold text-[#151515] outline-none focus:border-[#f04438]"
+                >
+                  {SORTS.map((o) => (
+                    <option key={o.id} value={o.id}>{o.label}</option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="button"
                 onClick={() => setFiltersOpen((o) => !o)}
@@ -892,6 +746,15 @@ export const Marketplace: React.FC = () => {
                       />
                       In stock only
                     </label>
+                    <label className="flex h-9 items-center gap-2 text-[12px] font-semibold text-[#333]">
+                      <input
+                        type="checkbox"
+                        checked={verifiedOnly}
+                        onChange={(e) => setVerifiedOnly(e.target.checked)}
+                        className="h-4 w-4 accent-[#f04438]"
+                      />
+                      Verified suppliers only
+                    </label>
                   </div>
                   {activeFilterCount > 0 && (
                     <button
@@ -908,34 +771,50 @@ export const Marketplace: React.FC = () => {
           </div>
 
           <div className="p-5">
+            {!isLoading && query.trim() && (
+              <p className="mb-4 text-[12px] text-[#666]" aria-live="polite">
+                {filteredProducts.length} result{filteredProducts.length === 1 ? '' : 's'} for <strong className="text-[#151515]">&ldquo;{query.trim()}&rdquo;</strong>
+                {searched.usedSpellingTolerance && filteredProducts.length > 0 && ' (showing close spellings)'}
+              </p>
+            )}
             {isLoading ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>
             ) : pagedProducts.length > 0 ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {pagedProducts.map((product, index) => (
+                {pagedProducts.map((product) => (
                   <ProductCard
-                    key={`${product.id}-${index}`}
+                    key={product.id}
                     product={product}
                     onAddToCart={handleAddToCart}
-                    onBuyNow={handleBuyNow}
-                    onOpenDetail={setDetailProduct}
                   />
                 ))}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center border border-dashed border-gray-200 rounded p-16 text-center">
                 <Search size={40} className="text-gray-300 mb-4" />
-                <p className="font-black text-[#151515] text-lg">No products found</p>
-                <p className="mt-2 text-sm text-[#777]">Try a different category, price range, or search term.</p>
-                <button
-                  type="button"
-                  onClick={clearAllFilters}
-                  className="mt-5 h-10 rounded bg-[#f04438] px-6 text-[11px] font-black text-white transition-colors hover:bg-[#c0392b]"
-                >
-                  Clear filters
-                </button>
+                <p className="font-black text-[#151515] text-lg">
+                  {catalogProducts.length === 0 ? 'No products listed yet' : 'No products found'}
+                </p>
+                <p className="mt-2 text-sm text-[#777]">
+                  {catalogProducts.length === 0
+                    ? 'Stores are getting ready. Join the waitlist and we will tell you when shopping opens.'
+                    : 'Try a different spelling, category, price range or search term.'}
+                </p>
+                {catalogProducts.length === 0 ? (
+                  <Link href="/" className="mt-5 inline-flex h-10 items-center rounded bg-[#f04438] px-6 text-[11px] font-black text-white transition-colors hover:bg-[#c0392b]">
+                    Join the waitlist
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="mt-5 h-10 rounded bg-[#f04438] px-6 text-[11px] font-black text-white transition-colors hover:bg-[#c0392b]"
+                  >
+                    Clear filters
+                  </button>
+                )}
               </div>
             )}
 
@@ -1047,7 +926,7 @@ export const Marketplace: React.FC = () => {
             <h2 className="text-[16px] font-black text-[#151515]">Top Rated Products</h2>
             <button
               type="button"
-              onClick={() => { setActiveTab('featured'); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
+              onClick={() => { setSort('relevance'); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); }}
               className="text-[11px] font-semibold text-[#f04438] hover:underline"
             >
               View all →
@@ -1059,8 +938,6 @@ export const Marketplace: React.FC = () => {
                 key={`rated-${product.id}-${i}`}
                 product={product}
                 onAddToCart={handleAddToCart}
-                onBuyNow={handleBuyNow}
-                onOpenDetail={setDetailProduct}
                 horizontal
               />
             ))}
@@ -1189,18 +1066,6 @@ export const Marketplace: React.FC = () => {
           </div>
         </div>
       </footer>
-
-      {/* ── Product Detail Modal ── */}
-      {detailProduct && (
-        <ProductModal
-          product={detailProduct}
-          onClose={() => setDetailProduct(null)}
-          onAddToCart={handleAddToCart}
-          onBuyNow={handleBuyNow}
-          onSubmitReview={addProductReview}
-          currentUserName={profile?.fullName}
-        />
-      )}
 
       {/* ── Cart Drawer ── */}
       {cartOpen && (

@@ -158,3 +158,12 @@ export async function updateDropshipperStoreCustomization(
   if (error) throw error;
   return mapDropshipperProfile(data as DropshipperProfileRow);
 }
+
+// ── Product options ───────────────────────────────────────────────────────────
+
+/** Ids of products that have selectable options (size, colour...). Empty if the options table isn't set up yet. */
+export async function getProductIdsWithOptions(): Promise<Set<string>> {
+  const { data, error } = await supabase.from('product_variants').select('product_id').eq('is_active', true).limit(5000);
+  if (error) return new Set();
+  return new Set((data as { product_id: string }[]).map((r) => r.product_id));
+}
