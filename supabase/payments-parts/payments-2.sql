@@ -56,7 +56,7 @@ as $$
 declare
   v_n integer;
 begin
-  if not public.checkout_payments_required() then
+  if not public.payments_required() then
     return 0;
   end if;
   update public.orders

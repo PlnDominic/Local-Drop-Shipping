@@ -27,7 +27,7 @@ insert into public.app_settings (key, value) values ('payments_required', 'false
 on conflict (key) do nothing;
 
 -- Public: the checkout asks whether it must collect payment.
-create or replace function public.checkout_payments_required()
+create or replace function public.payments_required()
 returns boolean
 language sql
 stable
@@ -37,7 +37,7 @@ as $$
   select coalesce((select (value)::text = 'true' from public.app_settings where key = 'payments_required'), false);
 $$;
 
-grant execute on function public.checkout_payments_required() to anon, authenticated;
+grant execute on function public.payments_required() to anon, authenticated;
 
 create or replace function public.set_payments_required(p_on boolean)
 returns boolean
@@ -188,7 +188,7 @@ as $$
 declare
   v_n integer;
 begin
-  if not public.checkout_payments_required() then
+  if not public.payments_required() then
     return 0;
   end if;
   update public.orders
@@ -218,7 +218,7 @@ as $$
 begin
   if new.status in ('confirmed', 'processing', 'shipped', 'delivered')
      and new.payment_status <> 'paid'
-     and public.checkout_payments_required()
+     and public.payments_required()
      and coalesce(public.app_user_role(), '') <> 'admin'
      and auth.uid() is not null then
     raise exception 'This order has not been paid for yet.';
@@ -242,7 +242,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if not public.checkout_payments_required() then
+  if not public.payments_required() then
     perform public.notify_order_placed(new.id);
   end if;
   return null;

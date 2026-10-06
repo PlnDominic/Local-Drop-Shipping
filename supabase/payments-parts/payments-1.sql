@@ -29,7 +29,7 @@ insert into public.app_settings (key, value) values ('payments_required', 'false
 on conflict (key) do nothing;
 
 -- Public: the checkout asks whether it must collect payment.
-create or replace function public.checkout_payments_required()
+create or replace function public.payments_required()
 returns boolean
 language sql
 stable
@@ -39,7 +39,7 @@ as $$
   select coalesce((select (value)::text = 'true' from public.app_settings where key = 'payments_required'), false);
 $$;
 
-grant execute on function public.checkout_payments_required() to anon, authenticated;
+grant execute on function public.payments_required() to anon, authenticated;
 
 create or replace function public.set_payments_required(p_on boolean)
 returns boolean

@@ -10,7 +10,7 @@ as $$
 begin
   if new.status in ('confirmed', 'processing', 'shipped', 'delivered')
      and new.payment_status <> 'paid'
-     and public.checkout_payments_required()
+     and public.payments_required()
      and coalesce(public.app_user_role(), '') <> 'admin'
      and auth.uid() is not null then
     raise exception 'This order has not been paid for yet.';
@@ -34,7 +34,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if not public.checkout_payments_required() then
+  if not public.payments_required() then
     perform public.notify_order_placed(new.id);
   end if;
   return null;
