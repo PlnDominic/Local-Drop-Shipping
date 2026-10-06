@@ -232,6 +232,20 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
                             My Dashboard
                           </Link>
                         )}
+                        <Link
+                          href="/orders"
+                          onClick={() => setAccountOpen(false)}
+                          className="block w-full px-4 py-2 text-left text-[12px] font-semibold text-[#333] hover:bg-[#f5f5f5]"
+                        >
+                          My Orders
+                        </Link>
+                        <Link
+                          href="/support"
+                          onClick={() => setAccountOpen(false)}
+                          className="block w-full px-4 py-2 text-left text-[12px] font-semibold text-[#333] hover:bg-[#f5f5f5]"
+                        >
+                          Support
+                        </Link>
                         <button
                           type="button"
                           onClick={async () => { setAccountOpen(false); await signOut(); router.push('/'); }}
