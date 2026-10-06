@@ -4,6 +4,9 @@
 --
 -- Paste this whole file into the Supabase SQL editor and Run. Safe to re-run.
 -- Requires the base schema (supabase/schema.sql) to be applied first.
+-- Then run supabase/catalog-features.sql, which replaces create_order and
+-- update_order_status with variant-aware versions. Never re-run this file on its
+-- own afterwards without re-running catalog-features.sql too.
 -- ============================================================================
 
 
