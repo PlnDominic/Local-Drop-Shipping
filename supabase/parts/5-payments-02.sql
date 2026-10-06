@@ -1,4 +1,4 @@
--- Payments setup, part 2 of 3. Run the parts in order (1, 2, 3). Safe to re-run.
+-- payments.sql part 2 of 3. Run parts in order. Safe to re-run.
 
 -- Service role only: called after Paystack confirms a charge. Idempotent.
 -- Amount is in pesewas as Paystack reports it.

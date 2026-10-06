@@ -1,4 +1,4 @@
--- Payments setup, part 1 of 3. Run the parts in order (1, 2, 3). Safe to re-run.
+-- payments.sql part 1 of 3. Run parts in order. Safe to re-run.
 
 -- ============================================================================
 -- Real checkout payments (Paystack: MTN/Telecel/AirtelTigo mobile money and cards).

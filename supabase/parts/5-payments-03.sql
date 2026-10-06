@@ -1,4 +1,4 @@
--- Payments setup, part 3 of 3. Run the parts in order (1, 2, 3). Safe to re-run.
+-- payments.sql part 3 of 3. Run parts in order. Safe to re-run.
 
 -- Fulfilment needs payment (admins can still override for support cases).
 create or replace function public.require_payment_before_fulfilment()
