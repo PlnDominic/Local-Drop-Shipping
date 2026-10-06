@@ -76,6 +76,10 @@ create trigger guard_user_privileged_columns
   for each row execute function public.guard_user_privileged_columns();
 
 -- 3. Guard supplier approval / rating on public.supplier_profiles.
+-- (is_verified is the supplier "Verified" badge granted by admins; see launch-features.sql)
+alter table public.supplier_profiles
+  add column if not exists is_verified boolean not null default false;
+
 create or replace function public.guard_supplier_privileged_columns()
 returns trigger
 language plpgsql
@@ -89,9 +93,11 @@ begin
 
   if tg_op = 'INSERT' then
     new.is_approved := false;
+    new.is_verified := false;
     new.rating := 0;
   else
     new.is_approved := old.is_approved;
+    new.is_verified := old.is_verified;
     new.rating := old.rating;
   end if;
   return new;
