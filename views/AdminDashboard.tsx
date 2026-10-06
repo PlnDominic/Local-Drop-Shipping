@@ -38,6 +38,7 @@ const STATUS_STYLE: Record<Order['status'], string> = {
   shipped: 'bg-[#f04438]/10 text-[#c0392b]',
   delivered: 'bg-emerald-50 text-emerald-700',
   cancelled: 'bg-gray-100 text-gray-500',
+  refunded: 'bg-red-50 text-red-700',
 };
 
 export const AdminDashboard: React.FC = () => {

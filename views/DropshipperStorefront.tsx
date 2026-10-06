@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { DeliveryFields } from '../components/checkout/DeliveryFields';
+import { isValidGhanaPostGps, normalizeGhanaPostGps, type DeliveryQuote } from '../lib/checkout';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -261,6 +263,7 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [deliveryQuote, setDeliveryQuote] = useState<DeliveryQuote | null>(null);
 
   const [cart, setCart] = useState<CartLine[]>([]);
 
@@ -371,7 +374,7 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
 
   const cartCount = cartLines.reduce((sum, l) => sum + l.quantity, 0);
   const cartSubtotal = cartLines.reduce((sum, l) => sum + l.item.sellingPrice * l.quantity, 0);
-  const deliveryFee = cartSubtotal > 0 ? 25 : 0;
+  const deliveryFee = deliveryQuote && cartSubtotal > 0 ? deliveryQuote.fee : 0;
   const cartTotal = cartSubtotal + deliveryFee;
 
   const addToCart = (dropshipperProductId: string) => {
@@ -430,8 +433,17 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
     }
 
     setCheckoutError('');
-    setCheckoutSubmitting(true);
     const form = new FormData(event.currentTarget);
+    const gps = String(form.get('ghanaPostGps') || '');
+    if (!isValidGhanaPostGps(gps)) {
+      setCheckoutError('Enter a valid GhanaPost GPS address, like GA-184-9022.');
+      return;
+    }
+    if (!deliveryQuote) {
+      setCheckoutError('Choose a region we deliver to so we can work out your delivery fee.');
+      return;
+    }
+    setCheckoutSubmitting(true);
     const result = await submitOrder({
       dropshipperId: store.id,
       items: cartLines.map((l) => ({ productId: l.item.productId, quantity: l.quantity })),
@@ -439,7 +451,7 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
       phone: String(form.get('phone') || ''),
       region: String(form.get('region') || ''),
       city: String(form.get('city') || ''),
-      ghanaPostGps: String(form.get('ghanaPostGps') || ''),
+      ghanaPostGps: normalizeGhanaPostGps(gps),
       notes: String(form.get('notes') || ''),
     });
     setCheckoutSubmitting(false);
@@ -1062,8 +1074,8 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
                   <span>{formatMoney(cartSubtotal)}</span>
                 </div>
                 <div className="flex justify-between text-[#777]">
-                  <span>Delivery (GhanaPost GPS)</span>
-                  <span>{formatMoney(deliveryFee)}</span>
+                  <span>Delivery</span>
+                  <span>{deliveryQuote ? formatMoney(deliveryFee) : 'Calculated at checkout'}</span>
                 </div>
                 <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-black text-[#151515]">
                   <span>Total</span>
@@ -1141,33 +1153,12 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
                   className="h-10 rounded-lg border border-gray-200 px-3 text-xs text-[#1c1c1c] outline-none focus:border-gray-400"
                 />
               </label>
-              <label className="grid gap-1 text-[11px] font-black text-[#666]">
-                Region
-                <input
-                  name="region"
-                  required
-                  placeholder="e.g. Greater Accra"
-                  className="h-10 rounded-lg border border-gray-200 px-3 text-xs text-[#1c1c1c] outline-none focus:border-gray-400"
-                />
-              </label>
-              <label className="grid gap-1 text-[11px] font-black text-[#666]">
-                City / Town
-                <input
-                  name="city"
-                  required
-                  placeholder="e.g. Madina"
-                  className="h-10 rounded-lg border border-gray-200 px-3 text-xs text-[#1c1c1c] outline-none focus:border-gray-400"
-                />
-              </label>
-              <label className="grid gap-1 text-[11px] font-black text-[#666]">
-                GhanaPost GPS Address
-                <input
-                  name="ghanaPostGps"
-                  required
-                  placeholder="GA-184-9022"
-                  className="h-10 rounded-lg border border-gray-200 px-3 text-xs text-[#1c1c1c] outline-none focus:border-gray-400"
-                />
-              </label>
+              <DeliveryFields
+                onQuoteChange={(quote) => setDeliveryQuote(quote)}
+                labelClassName="text-[11px] font-black text-[#666]"
+                inputClassName="h-10 rounded-lg border border-gray-200 px-3 text-xs font-normal text-[#1c1c1c] outline-none focus:border-gray-400 bg-white"
+                accentColor={themeColor}
+              />
               <label className="grid gap-1 text-[11px] font-black text-[#666]">
                 MTN MoMo / Telecel Number
                 <input
@@ -1195,8 +1186,8 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
                 <span>{formatMoney(cartSubtotal)}</span>
               </div>
               <div className="flex justify-between text-xs text-[#777]">
-                <span>Standard Delivery</span>
-                <span>{formatMoney(deliveryFee)}</span>
+                <span>Delivery</span>
+                <span>{deliveryQuote ? formatMoney(deliveryFee) : 'Choose your region'}</span>
               </div>
               <div className="flex justify-between text-sm font-black border-t border-gray-200 pt-2 text-[#151515]">
                 <span>Total Payable</span>

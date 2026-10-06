@@ -900,6 +900,8 @@ export const DropshipperDashboard: React.FC = () => {
                             o.status === 'delivered' ? 'bg-[#f04438]/10 text-[#c0392b]' :
                             o.status === 'shipped' ? 'bg-blue-50 text-blue-700' :
                             o.status === 'processing' ? 'bg-purple-50 text-purple-700' :
+                            o.status === 'cancelled' ? 'bg-gray-100 text-gray-500' :
+                            o.status === 'refunded' ? 'bg-red-50 text-red-700' :
                             'bg-yellow-50 text-yellow-700'
                           }`}>
                             {o.status}

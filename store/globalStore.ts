@@ -1,3 +1,4 @@
+import { emailReceipt } from '../lib/receipts';
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase/client';
 
@@ -116,9 +117,12 @@ export interface Order {
   dropshipperStoreName: string;
   supplierId: string;
   supplierBusinessName: string;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
   totalAmount: number;
   platformFee: number; // the platform's cut, already included in totalAmount
+  deliveryFee: number; // charged once per order, already included in totalAmount
+  deliveryMinDays?: number;
+  deliveryMaxDays?: number;
   profitAmount: number; // (sellingPrice - costPrice) * quantity
   costAmount: number; // costPrice * quantity
   deliveryAddress: {
@@ -407,6 +411,7 @@ interface OrderDbRow {
   id: string;
   order_number: string | null;
   dropshipper_id: string;
+  customer_id: string | null;
   customer_name: string;
   customer_phone: string;
   customer_region: string | null;
@@ -415,6 +420,9 @@ interface OrderDbRow {
   status: Order['status'];
   total: number;
   platform_fee: number;
+  delivery_fee: number | null;
+  delivery_min_days: number | null;
+  delivery_max_days: number | null;
   notes: string | null;
   created_at: string;
   dropshipper_profiles?: { store_name: string | null } | null;
@@ -433,7 +441,7 @@ function mapOrderRow(row: OrderDbRow): Order {
   return {
     id: row.id,
     orderNumber: row.order_number ?? row.id.slice(0, 8).toUpperCase(),
-    customerId: '',
+    customerId: row.customer_id ?? '',
     customerName: row.customer_name,
     customerPhone: row.customer_phone,
     dropshipperId: row.dropshipper_id,
@@ -443,6 +451,9 @@ function mapOrderRow(row: OrderDbRow): Order {
     status: row.status,
     totalAmount: Number(row.total),
     platformFee: Number(row.platform_fee ?? 0),
+    deliveryFee: Number(row.delivery_fee ?? 0),
+    deliveryMinDays: row.delivery_min_days ?? undefined,
+    deliveryMaxDays: row.delivery_max_days ?? undefined,
     profitAmount,
     costAmount,
     deliveryAddress: {
@@ -1096,8 +1107,10 @@ export const useGlobalStore = create<AppState>((set, get) => ({
 
     if (error) return { success: false, error: error.message };
 
+    const created = data as { id?: string; order_number?: string } | null;
+    if (created?.id) emailReceipt(created.id);
     void get().hydrate();
-    return { success: true, orderNumber: (data as { order_number?: string } | null)?.order_number };
+    return { success: true, orderNumber: created?.order_number };
   },
 
   submitCheckout: async (checkoutData) => {
@@ -1132,8 +1145,9 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         p_notes: checkoutData.notes || null,
       });
       if (error) return { success: false, error: error.message };
-      const orderNumber = (data as { order_number?: string } | null)?.order_number;
-      firstOrderNumber = firstOrderNumber ?? orderNumber;
+      const created = data as { id?: string; order_number?: string } | null;
+      if (created?.id) emailReceipt(created.id);
+      firstOrderNumber = firstOrderNumber ?? created?.order_number;
     }
 
     set({ cart: [] });

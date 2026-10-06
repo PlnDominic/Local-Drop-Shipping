@@ -715,7 +715,9 @@ export const SupplierDashboard: React.FC = () => {
                     <span className="text-[#999]">{new Date(o.createdAt).toLocaleString()}</span>
                     <span className={`ml-auto px-2.5 py-1 rounded text-[9px] font-black uppercase tracking-wider ${
                       o.status === 'delivered' || o.status === 'shipped' ? 'bg-[#f04438]/10 text-[#c0392b]' :
-                      o.status === 'processing' ? 'bg-purple-50 text-purple-700' : 'bg-yellow-50 text-yellow-700'
+                      o.status === 'processing' ? 'bg-purple-50 text-purple-700' :
+                      o.status === 'cancelled' ? 'bg-gray-100 text-gray-500' :
+                      o.status === 'refunded' ? 'bg-red-50 text-red-700' : 'bg-yellow-50 text-yellow-700'
                     }`}>{o.status}</span>
                   </div>
 

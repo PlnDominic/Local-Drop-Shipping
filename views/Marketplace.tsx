@@ -25,6 +25,8 @@ import {
   Zap
 } from 'lucide-react';
 import Link from 'next/link';
+import { DeliveryFields } from '../components/checkout/DeliveryFields';
+import { isValidGhanaPostGps, normalizeGhanaPostGps, type DeliveryQuote } from '../lib/checkout';
 import { useRouter } from 'next/navigation';
 import { useGlobalStore } from '../store/globalStore';
 import type { DropshipperProduct, ProductReview } from '../store/globalStore';
@@ -416,6 +418,7 @@ export const Marketplace: React.FC = () => {
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [deliveryQuote, setDeliveryQuote] = useState<DeliveryQuote | null>(null);
   const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [detailProduct, setDetailProduct] = useState<DropshipperProduct | null>(null);
@@ -523,7 +526,9 @@ export const Marketplace: React.FC = () => {
 
   const cartCount = cartLines.reduce((sum, l) => sum + l.quantity, 0);
   const cartSubtotal = cartLines.reduce((sum, l) => sum + l.item.sellingPrice * l.quantity, 0);
-  const deliveryFee = cartSubtotal > 0 ? 25 : 0;
+  // The delivery fee is charged once per store order, and a cart can span several stores.
+  const shipmentCount = new Set(cartLines.map((l) => l.item.dropshipperId)).size;
+  const deliveryFee = deliveryQuote && cartSubtotal > 0 ? deliveryQuote.fee * shipmentCount : 0;
   const promoDiscount = appliedPromo ? cartSubtotal * appliedPromo.discount : 0;
   const cartTotal = cartSubtotal + deliveryFee - promoDiscount;
 
@@ -559,14 +564,23 @@ export const Marketplace: React.FC = () => {
     }
 
     setCheckoutError('');
-    setCheckoutSubmitting(true);
     const form = new FormData(event.currentTarget);
+    const gps = String(form.get('ghanaPostGps') || '');
+    if (!isValidGhanaPostGps(gps)) {
+      setCheckoutError('Enter a valid GhanaPost GPS address, like GA-184-9022.');
+      return;
+    }
+    if (!deliveryQuote) {
+      setCheckoutError('Choose a region we deliver to so we can work out your delivery fee.');
+      return;
+    }
+    setCheckoutSubmitting(true);
     const result = await submitCheckout({
       fullName: String(form.get('fullName') || ''),
       phone: String(form.get('phone') || ''),
       region: String(form.get('region') || ''),
       city: String(form.get('city') || ''),
-      ghanaPostGps: String(form.get('ghanaPostGps') || ''),
+      ghanaPostGps: normalizeGhanaPostGps(gps),
       paymentProvider: 'mtn_momo',
       momoNumber: String(form.get('momoNumber') || ''),
       notes: String(form.get('notes') || '')
@@ -1247,7 +1261,7 @@ export const Marketplace: React.FC = () => {
                   <span>Subtotal</span><span>{formatMoney(cartSubtotal)}</span>
                 </div>
                 <div className="flex justify-between text-[#777]">
-                  <span>Delivery</span><span>{formatMoney(deliveryFee)}</span>
+                  <span>Delivery</span><span>{deliveryQuote ? formatMoney(deliveryFee) : 'Calculated at checkout'}</span>
                 </div>
                 {promoDiscount > 0 && (
                   <div className="flex justify-between text-[#f04438]">
@@ -1333,18 +1347,23 @@ export const Marketplace: React.FC = () => {
 
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                { name: 'fullName', label: 'Full name', value: 'Ama Mensah' },
-                { name: 'phone', label: 'Phone', value: '+233244123456' },
-                { name: 'region', label: 'Region', value: 'Greater Accra' },
-                { name: 'city', label: 'City', value: 'Accra' },
-                { name: 'ghanaPostGps', label: 'GhanaPost GPS', value: 'GA-184-9022' },
-                { name: 'momoNumber', label: 'MoMo number', value: '+233244123456' }
+                { name: 'fullName', label: 'Full name', placeholder: 'e.g. Ama Mensah', autoComplete: 'name' },
+                { name: 'phone', label: 'Phone', placeholder: '024 XXX XXXX', autoComplete: 'tel' },
               ].map((f) => (
                 <label key={f.name} className="grid gap-1 text-xs font-black text-[#777]">
                   {f.label}
-                  <input name={f.name} defaultValue={f.value} required className="h-11 rounded border border-gray-200 px-4 text-sm text-[#1c1c1c] outline-none focus:border-[#f04438]" />
+                  <input name={f.name} required placeholder={f.placeholder} autoComplete={f.autoComplete} className="h-11 rounded border border-gray-200 px-4 text-sm text-[#1c1c1c] outline-none focus:border-[#f04438]" />
                 </label>
               ))}
+              <DeliveryFields
+                onQuoteChange={(quote) => setDeliveryQuote(quote)}
+                labelClassName="text-xs font-black text-[#777]"
+                inputClassName="h-11 rounded border border-gray-200 px-4 text-sm font-normal text-[#1c1c1c] outline-none focus:border-[#f04438] bg-white"
+              />
+              <label className="grid gap-1 text-xs font-black text-[#777]">
+                MoMo number
+                <input name="momoNumber" required placeholder="024 XXX XXXX" autoComplete="tel" className="h-11 rounded border border-gray-200 px-4 text-sm text-[#1c1c1c] outline-none focus:border-[#f04438]" />
+              </label>
             </div>
 
             <label className="mt-3 grid gap-1 text-xs font-black text-[#777]">
@@ -1357,7 +1376,10 @@ export const Marketplace: React.FC = () => {
                 <span>Subtotal</span><span>{formatMoney(cartSubtotal)}</span>
               </div>
               <div className="flex justify-between text-sm text-[#777]">
-                <span>Delivery</span><span>{formatMoney(deliveryFee)}</span>
+                <span>
+                  Delivery{shipmentCount > 1 && deliveryQuote ? ` (${shipmentCount} stores × ${formatMoney(deliveryQuote.fee)})` : ''}
+                </span>
+                <span>{deliveryQuote ? formatMoney(deliveryFee) : 'Choose your region'}</span>
               </div>
               {promoDiscount > 0 && (
                 <div className="flex justify-between text-sm text-[#f04438]">
