@@ -106,3 +106,17 @@ export async function sendWhatsApp(to: string, body: string): Promise<SendResult
     body: params,
   });
 }
+
+/** Sends a ready-made HTML email through Resend (used for waitlist invites). */
+export async function sendHtmlEmail(to: string, subject: string, html: string): Promise<SendResult> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RECEIPT_FROM_EMAIL;
+  if (!apiKey || !from) return skip('Email is not configured');
+  return post(process.env.RESEND_API_URL || 'https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to: [to], subject, html }),
+  });
+}
+
+export { escapeHtml };

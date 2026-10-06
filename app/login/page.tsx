@@ -29,12 +29,13 @@ function LoginPageInner() {
   const searchParams = useSearchParams();
   const { session, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
 
-  const [mode, setMode] = useState<Mode>('signin');
+  // Invite links look like /login?mode=signup&role=supplier&email=...
+  const [mode, setMode] = useState<Mode>(searchParams.get('mode') === 'signup' ? 'signup' : 'signin');
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(searchParams.get('email')?.slice(0, 254) ?? '');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<Role>('customer');
+  const [role, setRole] = useState<Role>(['dropshipper', 'supplier'].includes(searchParams.get('role') ?? '') ? (searchParams.get('role') as Role) : 'customer');
 
   const [error, setError] = useState('');
   const msg = searchParams.get('msg');

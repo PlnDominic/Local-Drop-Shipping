@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Copy, Download, Heart, MailCheck, MailX, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { Copy, Download, Heart, MailCheck, MailX, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
 import { useToast } from '../Toast';
 import {
   deleteWishlistSignups,
   getWishlistSignups,
+  sendWishlistInvites,
   setWishlistInvited,
   type WishlistRole,
   type WishlistSignup,
@@ -28,6 +29,7 @@ export const WishlistSignupsPanel: React.FC<{ onCountsChange?: (pendingInvites: 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState('');
 
   const [roleFilter, setRoleFilter] = useState<WishlistRole | 'all'>('all');
   const [inviteFilter, setInviteFilter] = useState<InviteFilter>('all');
@@ -58,6 +60,7 @@ export const WishlistSignupsPanel: React.FC<{ onCountsChange?: (pendingInvites: 
       dropshipper: signups.filter((s) => s.role === 'dropshipper').length,
       supplier: signups.filter((s) => s.role === 'supplier').length,
       pending,
+      joined: signups.filter((s) => s.joinedAt).length,
     };
   }, [signups]);
 
@@ -100,9 +103,9 @@ export const WishlistSignupsPanel: React.FC<{ onCountsChange?: (pendingInvites: 
   };
 
   const exportCsv = () => {
-    const header = 'email,role,name,signed_up,invited_at';
+    const header = 'email,role,name,signed_up,invited_at,joined_at';
     const lines = targets.map((s) =>
-      [s.email, s.role, s.fullName, s.createdAt, s.invitedAt ?? ''].map(csvCell).join(','),
+      [s.email, s.role, s.fullName, s.createdAt, s.invitedAt ?? '', s.joinedAt ?? ''].map(csvCell).join(','),
     );
     const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -130,6 +133,31 @@ export const WishlistSignupsPanel: React.FC<{ onCountsChange?: (pendingInvites: 
     }
   };
 
+  // Emails a sign-up link to everyone targeted who has not already joined.
+  const sendInvites = async () => {
+    const list = targets.filter((s) => !s.joinedAt);
+    if (!list.length) { showToast('Everyone shown has already joined.', 'error'); return; }
+    if (!window.confirm(`Email a sign-up invite to ${list.length} ${list.length === 1 ? 'person' : 'people'}?`)) return;
+    setBusy(true);
+    setProgress(`0/${list.length}`);
+    try {
+      const result = await sendWishlistInvites(list.map((s) => s.id), (d, t) => setProgress(`${d}/${t}`));
+      const sentSet = new Set(result.sentIds);
+      const now = new Date().toISOString();
+      setSignups((prev) => prev.map((s) => (sentSet.has(s.id) ? { ...s, invitedAt: now, inviteCount: s.inviteCount + 1 } : s)));
+      setSelected(new Set());
+      showToast(
+        `Sent ${result.sent} invite${result.sent === 1 ? '' : 's'}${result.failed.length ? `, ${result.failed.length} failed` : ''}.`,
+        result.failed.length ? 'error' : 'success',
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not send invites.', 'error');
+    } finally {
+      setBusy(false);
+      setProgress('');
+    }
+  };
+
   const removeSelected = async () => {
     const ids = selectedInView.map((s) => s.id);
     if (!ids.length) return;
@@ -153,12 +181,13 @@ export const WishlistSignupsPanel: React.FC<{ onCountsChange?: (pendingInvites: 
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           { label: 'Total signups', value: stats.total },
           { label: 'Dropshippers', value: stats.dropshipper },
           { label: 'Suppliers', value: stats.supplier },
           { label: 'Not yet invited', value: stats.pending, accent: true },
+          { label: 'Joined (made an account)', value: stats.joined },
         ].map((card) => (
           <div key={card.label} className="bg-white rounded border border-gray-100 p-4">
             <p className="text-[10px] uppercase tracking-wider text-[#999] font-bold">{card.label}</p>
@@ -214,6 +243,14 @@ export const WishlistSignupsPanel: React.FC<{ onCountsChange?: (pendingInvites: 
         </div>
 
         <div className="border-b border-gray-100 px-4 py-3 flex flex-wrap items-center gap-2 bg-[#fafafa]">
+          <button
+            type="button"
+            onClick={sendInvites}
+            disabled={busy || !targets.length}
+            className="h-9 rounded bg-[#f04438] px-3 text-[11px] font-black text-white hover:bg-[#c0392b] transition-colors flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <Send size={13} /> {busy && progress ? `Sending ${progress}…` : 'Send invites'}
+          </button>
           <button type="button" onClick={copyEmails} disabled={!targets.length} className={actionBtn}>
             <Copy size={13} /> Copy emails
           </button>
@@ -274,13 +311,14 @@ export const WishlistSignupsPanel: React.FC<{ onCountsChange?: (pendingInvites: 
                   <th className="p-4">Role</th>
                   <th className="p-4">Signed up</th>
                   <th className="p-4">Invite</th>
+                  <th className="p-4">Joined</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-[12px] text-[#151515]">
                 {loading
                   ? [0, 1, 2].map((i) => (
                       <tr key={i}>
-                        <td colSpan={6} className="p-4">
+                        <td colSpan={7} className="p-4">
                           <div className="h-4 rounded bg-gray-100 animate-pulse" />
                         </td>
                       </tr>
@@ -315,6 +353,14 @@ export const WishlistSignupsPanel: React.FC<{ onCountsChange?: (pendingInvites: 
                             <span className="text-emerald-600 font-black">Invited {formatDate(s.invitedAt)}</span>
                           ) : (
                             <span className="text-[#999] font-semibold">Not yet</span>
+                          )}
+                          {s.inviteCount > 1 && <span className="ml-1 text-[#999]">(×{s.inviteCount})</span>}
+                        </td>
+                        <td className="p-4 text-[11px]">
+                          {s.joinedAt ? (
+                            <span className="text-emerald-600 font-black">Joined {formatDate(s.joinedAt)}</span>
+                          ) : (
+                            <span className="text-[#999]">—</span>
                           )}
                         </td>
                       </tr>
