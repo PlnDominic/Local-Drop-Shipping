@@ -39,6 +39,9 @@ create table if not exists public.product_variants (
   unique (product_id, label)
 );
 
+alter table public.product_variants
+  add column if not exists is_active boolean not null default true;
+
 create index if not exists idx_product_variants_product on public.product_variants(product_id);
 
 alter table public.product_variants enable row level security;

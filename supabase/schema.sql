@@ -910,6 +910,12 @@ create table if not exists public.delivery_zones (
   check (max_days >= min_days)
 );
 
+-- In case the table was created earlier with fewer columns.
+alter table public.delivery_zones
+  add column if not exists is_active  boolean not null default true,
+  add column if not exists city       text,
+  add column if not exists updated_at timestamptz not null default now();
+
 -- One row per region, plus at most one per (region, city).
 create unique index if not exists idx_delivery_zones_key
   on public.delivery_zones (lower(region), (coalesce(lower(city), '')));
@@ -2080,6 +2086,9 @@ create table if not exists public.product_variants (
   updated_at       timestamptz not null default now(),
   unique (product_id, label)
 );
+
+alter table public.product_variants
+  add column if not exists is_active boolean not null default true;
 
 create index if not exists idx_product_variants_product on public.product_variants(product_id);
 
