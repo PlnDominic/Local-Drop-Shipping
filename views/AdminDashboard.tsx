@@ -1,9 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import { ReceiptButton } from '../components/ReceiptButton';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
 import type { Order, SupplierProfile } from '../store/globalStore';
 import { WishlistSignupsPanel } from '../components/admin/WishlistSignupsPanel';
+import { RefundsPanel } from '../components/admin/RefundsPanel';
+import { VerificationsPanel } from '../components/admin/VerificationsPanel';
+import { SupportPanel } from '../components/admin/SupportPanel';
+import { DeliveryZonesPanel } from '../components/admin/DeliveryZonesPanel';
+import { getAdminCounts } from '../lib/supabase/adminCounts';
+import { useAuth } from '../lib/auth/AuthProvider';
 import {
   LayoutGrid,
   FileCheck,
@@ -21,6 +28,9 @@ import {
   Truck,
   UserPlus,
   Heart,
+  RotateCcw,
+  BadgeCheck,
+  LifeBuoy,
 } from 'lucide-react';
 
 const formatMoney = (amount: number) =>
@@ -29,7 +39,7 @@ const formatMoney = (amount: number) =>
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-type Tab = 'wishlist' | 'overview' | 'suppliers' | 'dropshippers' | 'orders' | 'revenue' | 'users' | 'activity';
+type Tab = 'wishlist' | 'refunds' | 'verification' | 'support' | 'delivery' | 'overview' | 'suppliers' | 'dropshippers' | 'orders' | 'revenue' | 'users' | 'activity';
 
 const STATUS_STYLE: Record<Order['status'], string> = {
   pending: 'bg-yellow-50 text-yellow-700',
@@ -54,6 +64,12 @@ export const AdminDashboard: React.FC = () => {
   // Pre-launch the wishlist is the main thing to manage, so it opens first.
   const [activeTab, setActiveTab] = useState<Tab>('wishlist');
   const [wishlistPending, setWishlistPending] = useState(0);
+  const { profile } = useAuth();
+  const [adminCounts, setAdminCounts] = useState({ refunds: 0, verifications: 0, tickets: 0 });
+  const refreshCounts = useCallback(() => {
+    getAdminCounts().then(setAdminCounts).catch(() => undefined);
+  }, []);
+  useEffect(() => { refreshCounts(); }, [refreshCounts]);
   const [supplierQuery, setSupplierQuery] = useState('');
   const [dropshipperQuery, setDropshipperQuery] = useState('');
   const [userQuery, setUserQuery] = useState('');
@@ -130,6 +146,10 @@ export const AdminDashboard: React.FC = () => {
 
   const tabs: { id: Tab; label: string; icon: typeof LayoutGrid; badge?: number }[] = [
     { id: 'wishlist', label: 'Wishlist', icon: Heart, badge: wishlistPending },
+    { id: 'refunds', label: 'Refunds', icon: RotateCcw, badge: adminCounts.refunds },
+    { id: 'verification', label: 'Verification', icon: BadgeCheck, badge: adminCounts.verifications },
+    { id: 'support', label: 'Support', icon: LifeBuoy, badge: adminCounts.tickets },
+    { id: 'delivery', label: 'Delivery', icon: Truck },
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
     { id: 'suppliers', label: 'Suppliers', icon: FileCheck, badge: pendingSuppliers.length },
     { id: 'dropshippers', label: 'Dropshippers', icon: Store },
@@ -229,6 +249,11 @@ export const AdminDashboard: React.FC = () => {
         <div className={activeTab === 'wishlist' ? '' : 'hidden'}>
           <WishlistSignupsPanel onCountsChange={setWishlistPending} />
         </div>
+
+        {activeTab === 'refunds' && <RefundsPanel onChanged={refreshCounts} />}
+        {activeTab === 'verification' && <VerificationsPanel onChanged={refreshCounts} />}
+        {activeTab === 'support' && profile && <SupportPanel adminId={profile.id} onChanged={refreshCounts} />}
+        {activeTab === 'delivery' && <DeliveryZonesPanel />}
 
         {/* ── OVERVIEW ── */}
         {activeTab === 'overview' && (
@@ -402,7 +427,7 @@ export const AdminDashboard: React.FC = () => {
                   <tbody className="divide-y divide-gray-100 text-[12px] text-[#151515]">
                     {orders.map((o) => (
                       <tr key={o.id} className="hover:bg-[#fafafa]">
-                        <td className="p-4 font-black text-[#f04438]">{o.orderNumber}</td>
+                        <td className="p-4 font-black text-[#f04438]">{o.orderNumber}<ReceiptButton orderId={o.id} orderNumber={o.orderNumber} /></td>
                         <td className="p-4 text-[#555] font-semibold">{o.dropshipperStoreName || '—'}</td>
                         <td className="p-4">
                           <span className="block font-bold">{o.customerName}</span>

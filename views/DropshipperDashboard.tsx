@@ -1,5 +1,6 @@
 'use client';
 
+import { ReceiptButton } from '../components/ReceiptButton';
 import React, { useRef, useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
 import type { Product } from '../store/globalStore';
@@ -885,7 +886,7 @@ export const DropshipperDashboard: React.FC = () => {
                   <tbody className="divide-y divide-gray-100 text-[12px] text-[#151515]">
                     {dpOrders.map((o) => (
                       <tr key={o.id} className="hover:bg-[#fafafa]">
-                        <td className="p-4 font-black text-[#f04438]">{o.orderNumber}</td>
+                        <td className="p-4 font-black text-[#f04438]">{o.orderNumber}<ReceiptButton orderId={o.id} orderNumber={o.orderNumber} /></td>
                         <td className="p-4">
                           <span className="block font-bold">{o.customerName}</span>
                           <span className="text-[10px] text-[#999]">{o.customerPhone}</span>

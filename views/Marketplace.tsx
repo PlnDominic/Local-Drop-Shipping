@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { DeliveryFields } from '../components/checkout/DeliveryFields';
+import { SupplierName } from '../components/SupplierName';
 import { isValidGhanaPostGps, normalizeGhanaPostGps, type DeliveryQuote } from '../lib/checkout';
 import { useRouter } from 'next/navigation';
 import { useGlobalStore } from '../store/globalStore';
@@ -155,7 +156,7 @@ const ProductModal: React.FC<{
               <h2 className="text-[20px] font-black leading-tight text-[#151515]">
                 {product.product.name}
               </h2>
-              <p className="mt-1 text-xs text-[#777]">By {product.product.supplierName}</p>
+              <p className="mt-1 text-xs text-[#777]"><SupplierName supplierId={product.product.supplierId} name={product.product.supplierName} /></p>
             </div>
             <p className="text-sm leading-relaxed text-[#444]">{product.customDescription}</p>
             <div className="flex items-center gap-3">
@@ -419,6 +420,8 @@ export const Marketplace: React.FC = () => {
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
   const [deliveryQuote, setDeliveryQuote] = useState<DeliveryQuote | null>(null);
+  // 'unavailable' means the delivery_zones database update isn't applied yet; checkout then works as before.
+  const [deliveryStatus, setDeliveryStatus] = useState<string>('idle');
   const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [detailProduct, setDetailProduct] = useState<DropshipperProduct | null>(null);
@@ -570,7 +573,7 @@ export const Marketplace: React.FC = () => {
       setCheckoutError('Enter a valid GhanaPost GPS address, like GA-184-9022.');
       return;
     }
-    if (!deliveryQuote) {
+    if (!deliveryQuote && deliveryStatus !== 'unavailable') {
       setCheckoutError('Choose a region we deliver to so we can work out your delivery fee.');
       return;
     }
@@ -1356,7 +1359,7 @@ export const Marketplace: React.FC = () => {
                 </label>
               ))}
               <DeliveryFields
-                onQuoteChange={(quote) => setDeliveryQuote(quote)}
+                onQuoteChange={(quote, status) => { setDeliveryQuote(quote); setDeliveryStatus(status); }}
                 labelClassName="text-xs font-black text-[#777]"
                 inputClassName="h-11 rounded border border-gray-200 px-4 text-sm font-normal text-[#1c1c1c] outline-none focus:border-[#f04438] bg-white"
               />

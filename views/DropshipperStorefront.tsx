@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { DeliveryFields } from '../components/checkout/DeliveryFields';
+import { SupplierName } from '../components/SupplierName';
 import { isValidGhanaPostGps, normalizeGhanaPostGps, type DeliveryQuote } from '../lib/checkout';
 import { useRouter } from 'next/navigation';
 import {
@@ -104,7 +105,7 @@ const ProductModal: React.FC<{
               <h2 className="text-[20px] font-black leading-tight text-[#151515]">
                 {product.product.name}
               </h2>
-              <p className="mt-1 text-xs text-[#777]">By {product.product.supplierName}</p>
+              <p className="mt-1 text-xs text-[#777]"><SupplierName supplierId={product.product.supplierId} name={product.product.supplierName} /></p>
             </div>
             <p className="text-sm leading-relaxed text-[#444]">
               {product.customDescription || product.product.description}
@@ -264,6 +265,8 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
   const [deliveryQuote, setDeliveryQuote] = useState<DeliveryQuote | null>(null);
+  // 'unavailable' means the delivery_zones database update isn't applied yet; checkout then works as before.
+  const [deliveryStatus, setDeliveryStatus] = useState<string>('idle');
 
   const [cart, setCart] = useState<CartLine[]>([]);
 
@@ -439,7 +442,7 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
       setCheckoutError('Enter a valid GhanaPost GPS address, like GA-184-9022.');
       return;
     }
-    if (!deliveryQuote) {
+    if (!deliveryQuote && deliveryStatus !== 'unavailable') {
       setCheckoutError('Choose a region we deliver to so we can work out your delivery fee.');
       return;
     }
@@ -1154,7 +1157,7 @@ export const DropshipperStorefront: React.FC<{ storeSlug: string }> = ({ storeSl
                 />
               </label>
               <DeliveryFields
-                onQuoteChange={(quote) => setDeliveryQuote(quote)}
+                onQuoteChange={(quote, status) => { setDeliveryQuote(quote); setDeliveryStatus(status); }}
                 labelClassName="text-[11px] font-black text-[#666]"
                 inputClassName="h-10 rounded-lg border border-gray-200 px-3 text-xs font-normal text-[#1c1c1c] outline-none focus:border-gray-400 bg-white"
                 accentColor={themeColor}

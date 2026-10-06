@@ -18,12 +18,14 @@ import {
   UploadCloud,
   Download,
   AlertTriangle,
+  BadgeCheck,
 } from 'lucide-react';
+import { VerificationCard } from '../components/supplier/VerificationCard';
 
 const formatMoney = (amount: number) =>
   `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
-type Tab = 'products' | 'upload' | 'bulk' | 'orders';
+type Tab = 'products' | 'upload' | 'bulk' | 'orders' | 'verification';
 
 // New-product form's working shape for a not-yet-saved variant row.
 type DraftVariant = { label: string; skuSuffix: string; priceAdjustment: string; stockQty: string };
@@ -262,6 +264,7 @@ export const SupplierDashboard: React.FC = () => {
     { id: 'upload', label: 'Upload Item', icon: Plus },
     { id: 'bulk', label: 'Bulk Import', icon: UploadCloud },
     { id: 'orders', label: 'Fulfillment', icon: Truck, badge: pendingCount },
+    { id: 'verification', label: 'Verification', icon: BadgeCheck },
   ];
 
   const inputClass =
@@ -278,7 +281,12 @@ export const SupplierDashboard: React.FC = () => {
               Supplier Portal
               {supplierProfile?.isApproved && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] text-emerald-400">
-                  <CheckCircle2 size={10} /> Verified
+                  <CheckCircle2 size={10} /> Approved
+                </span>
+              )}
+              {supplierProfile?.isVerified && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[9px] text-blue-300">
+                  <BadgeCheck size={10} /> Verified
                 </span>
               )}
             </p>
@@ -329,6 +337,8 @@ export const SupplierDashboard: React.FC = () => {
       </div>
 
       <div className="max-w-[1280px] mx-auto px-4 py-5 space-y-4">
+
+        {activeTab === 'verification' && <VerificationCard />}
 
         {/* ── PRODUCTS ── */}
         {activeTab === 'products' && (

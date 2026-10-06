@@ -23,6 +23,8 @@ export interface SupplierProfile {
   region: string;
   description: string;
   isApproved: boolean;
+  /** Admin-granted "Verified" badge (identity and business documents checked). */
+  isVerified: boolean;
   rating: number;
   createdAt: string;
 }
@@ -316,6 +318,7 @@ interface SupplierProfileDbRow {
   region: string | null;
   description: string | null;
   is_approved: boolean;
+  is_verified?: boolean | null;
   rating: number | null;
   created_at: string;
 }
@@ -329,6 +332,7 @@ function mapSupplierProfileRow(row: SupplierProfileDbRow): SupplierProfile {
     region: row.region ?? '',
     description: row.description ?? '',
     isApproved: row.is_approved,
+    isVerified: row.is_verified ?? false,
     rating: Number(row.rating ?? 0),
     createdAt: row.created_at,
   };
