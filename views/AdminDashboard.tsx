@@ -9,6 +9,7 @@ import { RefundsPanel } from '../components/admin/RefundsPanel';
 import { VerificationsPanel } from '../components/admin/VerificationsPanel';
 import { SupportPanel } from '../components/admin/SupportPanel';
 import { DeliveryZonesPanel } from '../components/admin/DeliveryZonesPanel';
+import { PaymentsPanel } from '../components/admin/PaymentsPanel';
 import { NotificationsPanel } from '../components/admin/NotificationsPanel';
 import { getAdminCounts } from '../lib/supabase/adminCounts';
 import { useAuth } from '../lib/auth/AuthProvider';
@@ -32,6 +33,7 @@ import {
   RotateCcw,
   BadgeCheck,
   LifeBuoy,
+  CreditCard,
 } from 'lucide-react';
 
 const formatMoney = (amount: number) =>
@@ -40,7 +42,7 @@ const formatMoney = (amount: number) =>
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-type Tab = 'wishlist' | 'refunds' | 'verification' | 'support' | 'delivery' | 'notifications' | 'overview' | 'suppliers' | 'dropshippers' | 'orders' | 'revenue' | 'users' | 'activity';
+type Tab = 'wishlist' | 'refunds' | 'verification' | 'support' | 'delivery' | 'notifications' | 'payments' | 'overview' | 'suppliers' | 'dropshippers' | 'orders' | 'revenue' | 'users' | 'activity';
 
 const STATUS_STYLE: Record<Order['status'], string> = {
   pending: 'bg-yellow-50 text-yellow-700',
@@ -151,6 +153,7 @@ export const AdminDashboard: React.FC = () => {
     { id: 'verification', label: 'Verification', icon: BadgeCheck, badge: adminCounts.verifications },
     { id: 'support', label: 'Support', icon: LifeBuoy, badge: adminCounts.tickets },
     { id: 'delivery', label: 'Delivery', icon: Truck },
+    { id: 'payments', label: 'Payments', icon: CreditCard },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
     { id: 'suppliers', label: 'Suppliers', icon: FileCheck, badge: pendingSuppliers.length },
@@ -256,6 +259,7 @@ export const AdminDashboard: React.FC = () => {
         {activeTab === 'verification' && <VerificationsPanel onChanged={refreshCounts} />}
         {activeTab === 'support' && profile && <SupportPanel adminId={profile.id} onChanged={refreshCounts} />}
         {activeTab === 'delivery' && <DeliveryZonesPanel />}
+        {activeTab === 'payments' && <PaymentsPanel />}
         {activeTab === 'notifications' && <NotificationsPanel />}
 
         {/* ── OVERVIEW ── */}

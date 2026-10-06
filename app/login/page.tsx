@@ -74,7 +74,7 @@ function LoginPageInner() {
       const { error: err } = await signIn(email, password);
       setSubmitting(false);
       if (err) return setError(err);
-      router.replace('/');
+      router.replace('/callback');
     } else {
       const { error: err, needsConfirmation } = await signUp({ email, password, fullName, phone, role });
       setSubmitting(false);
@@ -84,7 +84,7 @@ function LoginPageInner() {
         setMode('signin');
         return;
       }
-      router.replace('/');
+      router.replace('/callback');
     }
   };
 

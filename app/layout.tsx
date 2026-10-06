@@ -4,6 +4,7 @@ import { ToastContainer } from '../components/Toast';
 import { AuthProvider } from '../lib/auth/AuthProvider';
 import { HydrationGate } from '../components/HydrationGate';
 import { CookieNotice } from '../components/CookieNotice';
+import { PostOAuthRedirect } from '../components/PostOAuthRedirect';
 import { PwaRegister } from '../components/PwaRegister';
 import { RefCapture } from '../components/share/RefCapture';
 
@@ -65,6 +66,7 @@ export default function RootLayout({
           <HydrationGate />
           {children}
           <ToastContainer />
+          <PostOAuthRedirect />
           <RefCapture />
           <PwaRegister />
           <CookieNotice />

@@ -45,6 +45,9 @@ export async function dispatchNotifications(limit = 25): Promise<DispatchSummary
   const db = serviceClient();
   if (!db) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
 
+  // Free the stock held by orders that were never paid (a no-op unless payments are required).
+  await db.rpc('expire_unpaid_orders');
+
   const { data, error } = await db.rpc('claim_notifications', { p_limit: limit });
   if (error) throw new Error(error.message);
 

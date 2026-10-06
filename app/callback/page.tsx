@@ -3,19 +3,25 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth/AuthProvider';
+import { landingPath } from '../../lib/auth/landing';
 
 /**
  * OAuth redirect target. The Supabase client (detectSessionInUrl) exchanges the
  * code in the URL on load; once auth resolves we send the user on their way.
  */
 export default function CallbackPage() {
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (loading) return;
-    router.replace(session ? '/' : '/login');
-  }, [loading, session, router]);
+    if (!session) { router.replace('/login'); return; }
+    // Wait for the profile so we know which dashboard to open.
+    if (profile) { router.replace(landingPath(profile.role)); return; }
+    // No profile row yet: do not leave them spinning.
+    const t = setTimeout(() => router.replace('/marketplace'), 4000);
+    return () => clearTimeout(t);
+  }, [loading, session, profile, router]);
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] grid place-items-center font-sans">

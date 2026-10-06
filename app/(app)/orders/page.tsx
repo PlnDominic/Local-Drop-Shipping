@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { paymentsRequired, startPayment, verifyPayment } from '../../../lib/payments';
 import { CheckCircle2, Download, LifeBuoy, PackageOpen, Truck, XCircle } from 'lucide-react';
 import { useAuth } from '../../../lib/auth/AuthProvider';
 import { useToast } from '../../../components/Toast';
@@ -68,6 +69,7 @@ export default function MyOrdersPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [refundFor, setRefundFor] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [payOn, setPayOn] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!profile) return;
@@ -85,6 +87,36 @@ export default function MyOrdersPage() {
     if (profile) refresh();
     else if (!loading) setFetching(false);
   }, [profile, loading, refresh]);
+
+  // Whether unpaid orders need a Pay now button.
+  useEffect(() => { void paymentsRequired().then(setPayOn); }, []);
+
+  // Back from Paystack: confirm the payment, then show the result.
+  useEffect(() => {
+    if (!profile) return;
+    const q = new URLSearchParams(window.location.search);
+    const ref = q.get('reference') || q.get('trxref');
+    if (q.get('payment') === 'retry') showToast('Your order is saved. Tap Pay now to finish paying.', 'error');
+    if (!ref) return;
+    window.history.replaceState(null, '', '/orders');
+    void (async () => {
+      const result = await verifyPayment(ref);
+      if (result === 'paid' || result === 'already_paid') showToast('Payment received. Thank you!', 'success');
+      else if (result === 'pending') showToast('Your payment is still processing. This page will update shortly.', 'error');
+      else showToast('The payment did not go through. You can try again with Pay now.', 'error');
+      await refresh();
+    })();
+  }, [profile, refresh, showToast]);
+
+  const payNow = async (o: MyOrder) => {
+    setBusy(`p-${o.id}`);
+    try {
+      window.location.assign(await startPayment([o.id]));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not start the payment.', 'error');
+      setBusy(null);
+    }
+  };
 
   const run = async (id: string, fn: () => Promise<void>, ok: string) => {
     setBusy(id);
@@ -169,8 +201,24 @@ export default function MyOrdersPage() {
                     <p className="text-[13px] font-black text-[#151515]">{o.orderNumber}</p>
                     <p className="text-[11px] text-[#999]">{date(o.createdAt)}{o.storeName ? ` · ${o.storeName}` : ''}</p>
                   </div>
-                  <span className={`px-2.5 py-1 rounded text-[9px] font-black uppercase tracking-wider ${STATUS_STYLE[o.status]}`}>{o.status}</span>
+                  <span className={`px-2.5 py-1 rounded text-[9px] font-black uppercase tracking-wider ${STATUS_STYLE[o.status]}`}>
+                    {payOn && o.paymentStatus === 'unpaid' && o.status === 'pending' ? 'awaiting payment' : o.status}
+                  </span>
                 </div>
+
+                {payOn && o.paymentStatus === 'unpaid' && o.status === 'pending' && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-yellow-200 bg-yellow-50 px-4 py-3 text-[12px] text-[#5c4a00]">
+                    <span>Pay within 2 hours or this order is cancelled automatically.</span>
+                    <button
+                      type="button"
+                      onClick={() => payNow(o)}
+                      disabled={busy === `p-${o.id}`}
+                      className="h-9 rounded bg-[#f04438] px-4 text-[12px] font-black text-white hover:bg-[#c0392b] disabled:opacity-60"
+                    >
+                      {busy === `p-${o.id}` ? 'Opening…' : `Pay ${money(o.total)}`}
+                    </button>
+                  </div>
+                )}
 
                 <div className="px-4 py-3">
                   <Progress status={o.status} />

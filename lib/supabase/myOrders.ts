@@ -25,6 +25,7 @@ export interface MyOrder {
   createdAt: string;
   updatedAt: string;
   deliveredAt: string | null;
+  paymentStatus: 'paid' | 'unpaid';
   storeName: string;
   region: string;
   city: string;
@@ -46,6 +47,7 @@ interface OrderRow {
   created_at: string;
   updated_at: string;
   delivered_at: string | null;
+  payment_status?: 'paid' | 'unpaid' | null;
   customer_region: string | null;
   customer_city: string | null;
   customer_ghana_post_gps: string | null;
@@ -132,6 +134,7 @@ export async function getMyOrders(userId: string): Promise<MyOrder[]> {
     createdAt: o.created_at,
     updatedAt: o.updated_at,
     deliveredAt: o.delivered_at,
+    paymentStatus: o.payment_status === 'unpaid' ? 'unpaid' : 'paid',
     storeName: o.dropshipper_profiles?.store_name ?? '',
     region: o.customer_region ?? '',
     city: o.customer_city ?? '',

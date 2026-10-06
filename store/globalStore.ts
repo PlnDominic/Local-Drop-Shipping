@@ -1,5 +1,6 @@
 import { emailReceipt } from '../lib/receipts';
 import { kickNotifications } from '../lib/notifications';
+import { paymentsRequired, startPayment } from '../lib/payments';
 import { currentRef } from '../lib/share/ref';
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase/client';
@@ -610,6 +611,22 @@ const SEED_DROPSHIPPER_PRODUCTS: DropshipperProduct[] = [
     isPublished: true,
   },
 ];
+
+/**
+ * When online payment is switched on, sends the customer to Paystack to pay for these orders.
+ * If the payment page cannot open, the orders stay unpaid and show a "Pay now" button in My Orders.
+ */
+async function payOrRedirect(orderIds: string[]): Promise<void> {
+  if (orderIds.length === 0 || typeof window === 'undefined') return;
+  try {
+    if (!(await paymentsRequired())) return;
+    window.location.assign(await startPayment(orderIds));
+    // Keep the page busy until the browser leaves for the payment page.
+    await new Promise((resolve) => setTimeout(resolve, 15000));
+  } catch {
+    window.location.assign('/orders?payment=retry');
+  }
+}
 
 /** Credits the order to the share link the buyer arrived through (a no-op without one). */
 function creditShareLink(orderId: string): void {
@@ -1332,6 +1349,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       emailReceipt(created.id);
       creditShareLink(created.id);
       kickNotifications();
+      await payOrRedirect([created.id]);
     }
     void get().hydrate();
     return { success: true, orderNumber: created?.order_number };
@@ -1359,6 +1377,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
     if (byDropshipper.size === 0) return { success: false, error: 'Your cart is empty.' };
 
     let firstOrderNumber: string | undefined;
+    const createdIds: string[] = [];
     for (const [dropshipperId, items] of byDropshipper) {
       const { data, error } = await supabase.rpc('create_order', {
         p_dropshipper_id: dropshipperId,
@@ -1376,11 +1395,13 @@ export const useGlobalStore = create<AppState>((set, get) => ({
         emailReceipt(created.id);
         creditShareLink(created.id);
         kickNotifications();
+        createdIds.push(created.id);
       }
       firstOrderNumber = firstOrderNumber ?? created?.order_number;
     }
 
     set({ cart: [] });
+    await payOrRedirect(createdIds);
     void get().hydrate();
     return { success: true, orderNumber: firstOrderNumber };
   },
