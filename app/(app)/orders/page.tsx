@@ -190,6 +190,9 @@ export default function MyOrdersPage() {
                           <span className="grid h-10 w-10 place-items-center rounded bg-gray-100 text-gray-300"><PackageOpen size={16} /></span>
                         )}
                         <span className="min-w-0 flex-1 text-[13px] text-[#151515] truncate">{it.name} <span className="text-[#999]">× {it.quantity}</span></span>
+                        {o.status === 'delivered' && it.reviewHref && (
+                          <Link href={it.reviewHref} className="text-[11px] font-black text-[#f04438] hover:underline">Rate</Link>
+                        )}
                         <span className="text-[13px] font-semibold">{money(it.unitPrice * it.quantity)}</span>
                       </li>
                     ))}

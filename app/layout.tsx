@@ -1,13 +1,25 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ToastContainer } from '../components/Toast';
 import { AuthProvider } from '../lib/auth/AuthProvider';
 import { HydrationGate } from '../components/HydrationGate';
 import { CookieNotice } from '../components/CookieNotice';
+import { PwaRegister } from '../components/PwaRegister';
+import { RefCapture } from '../components/share/RefCapture';
 
 const heroImage = 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=90';
 
+export const viewport: Viewport = {
+  themeColor: '#151515',
+  width: 'device-width',
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
+  applicationName: 'Localdropshippinggh',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'LDS Ghana', statusBarStyle: 'black-translucent' },
+  icons: { icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }, { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }], apple: '/icons/apple-touch-icon.png' },
   metadataBase: new URL('https://www.localdropshippinggh.com'),
   title: 'Local Drop Shipping GH - Sell More. Stock Less. Grow Faster.',
   description: 'Local Drop Shipping GH — Ghana\'s local dropshipping storefront and operations platform. Connect with verified suppliers, import products in seconds, and earn commissions via MTN MoMo.',
@@ -53,6 +65,8 @@ export default function RootLayout({
           <HydrationGate />
           {children}
           <ToastContainer />
+          <RefCapture />
+          <PwaRegister />
           <CookieNotice />
         </AuthProvider>
       </body>

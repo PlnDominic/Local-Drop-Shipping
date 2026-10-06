@@ -10,6 +10,8 @@ import { SaveButton } from '../SaveButton';
 import { VerifiedBadge } from '../SupplierName';
 import type { ProductPageData } from '../../lib/server/catalog';
 import { absoluteUrl } from '../../lib/seo';
+import { OptimizedImage } from '../ui/OptimizedImage';
+import { Reviews, Stars } from './Reviews';
 
 const money = (n: number) => `GHS ${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
@@ -32,7 +34,7 @@ export const ProductView: React.FC<{ data: ProductPageData; inStock: boolean }> 
   const discount = data.suggestedPrice > price ? Math.round(((data.suggestedPrice - price) / data.suggestedPrice) * 100) : 0;
   const sku = `${data.sku}${variant?.skuSuffix ?? ''}` || null;
   const optionStock = variant?.stockQty ?? 0;
-  const maxQty = hasOptions ? Math.max(1, Math.min(10, optionStock || 10)) : 10;
+  const maxQty = hasOptions ? Math.max(1, Math.min(10, optionStock || 10)) : Math.max(1, Math.min(10, data.stockQty || 10));
   const needsChoice = hasOptions && !variant;
   const canBuy = inStock && !needsChoice && (!hasOptions || optionStock > 0);
 
@@ -85,7 +87,7 @@ export const ProductView: React.FC<{ data: ProductPageData; inStock: boolean }> 
           <section aria-label="Product photos">
             <div className="relative aspect-square overflow-hidden rounded border border-gray-100 bg-white">
               {images.length > 0 ? (
-                <img src={images[imgIndex]} alt={images.length > 1 ? `${data.name}, photo ${imgIndex + 1} of ${images.length}` : data.name} className="h-full w-full object-contain p-4" />
+                <OptimizedImage priority width={560} src={images[imgIndex]} alt={images.length > 1 ? `${data.name}, photo ${imgIndex + 1} of ${images.length}` : data.name} className="h-full w-full object-contain p-4" />
               ) : (
                 <div className="grid h-full w-full place-items-center text-gray-300"><Package size={64} /></div>
               )}
@@ -108,7 +110,7 @@ export const ProductView: React.FC<{ data: ProductPageData; inStock: boolean }> 
                       aria-current={i === imgIndex}
                       className={`h-16 w-16 overflow-hidden rounded border bg-white ${i === imgIndex ? 'border-[#f04438]' : 'border-gray-200 hover:border-gray-400'}`}
                     >
-                      <img src={src} alt="" loading="lazy" className="h-full w-full object-contain p-1" />
+                      <OptimizedImage src={src} alt="" width={64} className="h-full w-full object-contain p-1" />
                     </button>
                   </li>
                 ))}
@@ -120,6 +122,13 @@ export const ProductView: React.FC<{ data: ProductPageData; inStock: boolean }> 
           <section>
             <p className="text-[11px] font-black uppercase tracking-widest text-[#f04438]">{data.category?.name ?? 'Product'}</p>
             <h1 className="mt-1 text-[26px] font-black leading-tight text-[#151515]">{data.name}</h1>
+
+            {data.rating.count > 0 && (
+              <a href="#reviews-heading" className="mt-2 inline-flex items-center gap-2 text-[12px] text-[#555] hover:text-[#f04438]">
+                <Stars rating={data.rating.average} size={13} />
+                <strong>{data.rating.average.toFixed(1)}</strong> ({data.rating.count})
+              </a>
+            )}
 
             <p className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#777]">
               <span>By {data.supplier.name || 'a local supplier'}</span>
@@ -143,6 +152,12 @@ export const ProductView: React.FC<{ data: ProductPageData; inStock: boolean }> 
               <span className={`font-black ${canBuy || (needsChoice && inStock) ? 'text-emerald-600' : 'text-red-600'}`}>
                 {inStock ? (hasOptions && variant && optionStock <= 0 ? 'This option is out of stock' : 'In stock') : 'Out of stock'}
               </span>
+              {(() => {
+                const left = hasOptions ? (variant ? optionStock : null) : data.stockQty;
+                return inStock && left !== null && left > 0 && left <= 5
+                  ? <span className="font-black text-amber-600">Only {left} left</span>
+                  : null;
+              })()}
               {sku && <span className="text-[#999]">SKU: <span className="font-mono text-[#555]">{sku}</span></span>}
             </p>
 
@@ -236,6 +251,8 @@ export const ProductView: React.FC<{ data: ProductPageData; inStock: boolean }> 
           )}
         </div>
 
+        <Reviews productId={data.productId} rating={data.rating} reviews={data.reviews} />
+
         {related.length > 0 && (
           <section className="mt-8" aria-label="More in this category">
             <h2 className="text-[16px] font-black text-[#151515]">More in {data.category?.name}</h2>
@@ -245,7 +262,7 @@ export const ProductView: React.FC<{ data: ProductPageData; inStock: boolean }> 
                   <Link href={`/product/${r.id}`} className="block rounded border border-gray-100 bg-white p-3 hover:shadow-md transition-shadow">
                     <div className="aspect-square overflow-hidden rounded bg-[#f7f7f7]">
                       {r.product.images[0] ? (
-                        <img src={r.product.images[0]} alt={r.product.name} loading="lazy" className="h-full w-full object-contain p-2 mix-blend-multiply" />
+                        <OptimizedImage src={r.product.images[0]} alt={r.product.name} width={200} className="h-full w-full object-contain p-2 mix-blend-multiply" />
                       ) : (
                         <div className="grid h-full place-items-center text-gray-300"><Package size={28} /></div>
                       )}

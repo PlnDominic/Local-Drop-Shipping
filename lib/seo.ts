@@ -42,6 +42,18 @@ export function productJsonLd(p: ProductPageData) {
     category: p.category?.name,
     url,
     offers,
+    // Only emitted when real verified-buyer reviews exist (Google rejects made-up ratings).
+    aggregateRating: p.rating.count > 0
+      ? { '@type': 'AggregateRating', ratingValue: p.rating.average.toFixed(1), reviewCount: p.rating.count, bestRating: 5, worstRating: 1 }
+      : undefined,
+    review: p.reviews.slice(0, 5).map((r) => ({
+      '@type': 'Review',
+      author: { '@type': 'Person', name: r.reviewerName },
+      datePublished: r.createdAt.slice(0, 10),
+      name: r.title || undefined,
+      reviewBody: r.body || undefined,
+      reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5, worstRating: 1 },
+    })),
   };
 }
 

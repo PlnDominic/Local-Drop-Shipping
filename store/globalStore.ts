@@ -1,4 +1,6 @@
 import { emailReceipt } from '../lib/receipts';
+import { kickNotifications } from '../lib/notifications';
+import { currentRef } from '../lib/share/ref';
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase/client';
 
@@ -88,10 +90,15 @@ export interface Product {
   costPrice: number;
   suggestedPrice: number;
   stockQty: number;
+  /** The supplier is alerted when stock falls to this many units. */
+  lowStockThreshold?: number;
   sku: string;
   isActive: boolean;
   createdAt: string;
   reviews: ProductReview[];
+  /** Verified-buyer rating summary (from the product_rating_stats view). */
+  ratingAvg?: number;
+  ratingCount?: number;
   variants: ProductVariant[];
 }
 
@@ -248,9 +255,11 @@ interface AppState {
   addSupplierProduct: (productData: Omit<Product, 'id' | 'supplierId' | 'supplierName' | 'createdAt'>) => void;
   addSupplierProductsBulk: (rows: Omit<Product, 'id' | 'supplierId' | 'supplierName' | 'createdAt' | 'reviews' | 'variants' | 'specs'>[]) => number;
   updateSupplierProductStock: (productId: string, newQty: number) => void;
+  updateLowStockThreshold: (productId: string, threshold: number) => void;
   updateVariantStock: (productId: string, variantId: string, newQty: number) => void;
   fulfillOrder: (orderId: string) => Promise<void>;
   shipOrder: (orderId: string) => Promise<void>;
+  deliverOrder: (orderId: string) => Promise<void>;
 
   // Review Actions
   addProductReview: (productId: string, review: { author: string; rating: number; comment: string }) => void;
@@ -309,6 +318,7 @@ interface ProductDbRow {
   cost_price: number;
   suggested_price: number;
   stock_qty: number;
+  low_stock_threshold?: number | null;
   sku: string;
   is_active: boolean;
   created_at: string;
@@ -356,6 +366,7 @@ function mapProductRow(p: ProductDbRow): Product {
     costPrice: Number(p.cost_price),
     suggestedPrice: Number(p.suggested_price),
     stockQty: p.stock_qty,
+    lowStockThreshold: p.low_stock_threshold ?? 5,
     sku: p.sku,
     isActive: p.is_active,
     createdAt: p.created_at,
@@ -600,6 +611,13 @@ const SEED_DROPSHIPPER_PRODUCTS: DropshipperProduct[] = [
   },
 ];
 
+/** Credits the order to the share link the buyer arrived through (a no-op without one). */
+function creditShareLink(orderId: string): void {
+  const code = currentRef();
+  if (!code) return;
+  void Promise.resolve(supabase.rpc('attribute_order', { p_order_id: orderId, p_code: code })).catch(() => undefined);
+}
+
 export const useGlobalStore = create<AppState>((set, get) => ({
   activeRole: 'customer',
   setActiveRole: (role) => set({ activeRole: role }),
@@ -655,7 +673,27 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       } catch {
         /* options unavailable; products still load */
       }
-      const withVariants = (p: Product): Product => ({ ...p, variants: variantsByProduct.get(p.id) ?? p.variants });
+      // Verified-buyer rating summaries; optional until the engagement database update is applied.
+      const ratingsByProduct = new Map<string, { avg: number; count: number }>();
+      try {
+        const rr = await supabase.from('product_rating_stats').select('product_id, average, review_count').limit(5000);
+        if (!rr.error) {
+          for (const r of (rr.data ?? []) as { product_id: string; average: number | string; review_count: number }[]) {
+            ratingsByProduct.set(r.product_id, { avg: Number(r.average), count: r.review_count });
+          }
+        }
+      } catch {
+        /* ratings unavailable; products still load */
+      }
+      const withVariants = (p: Product): Product => {
+        const rating = ratingsByProduct.get(p.id);
+        return {
+          ...p,
+          variants: variantsByProduct.get(p.id) ?? p.variants,
+          ratingAvg: rating?.avg ?? 0,
+          ratingCount: rating?.count ?? 0,
+        };
+      };
 
       const categories: Category[] = (catsRes.data ?? []).map((c) => ({
         id: c.id,
@@ -1050,6 +1088,21 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       });
   },
 
+  updateLowStockThreshold: (productId, threshold) => {
+    const previous = get().products.find((p) => p.id === productId)?.lowStockThreshold;
+    const value = Math.max(0, Math.floor(threshold));
+    set((s) => ({ products: s.products.map((p) => (p.id === productId ? { ...p, lowStockThreshold: value } : p)) }));
+    supabase
+      .from('products')
+      .update({ low_stock_threshold: value })
+      .eq('id', productId)
+      .then(({ error }) => {
+        if (error && previous !== undefined) {
+          set((s) => ({ products: s.products.map((p) => (p.id === productId ? { ...p, lowStockThreshold: previous } : p)) }));
+        }
+      });
+  },
+
   updateVariantStock: (productId, variantId, newQty) => {
     const previous = get().products.find((p) => p.id === productId)?.variants.find((v) => v.id === variantId)?.stockQty;
     set((state) => ({
@@ -1275,7 +1328,11 @@ export const useGlobalStore = create<AppState>((set, get) => ({
     if (error) return { success: false, error: error.message };
 
     const created = data as { id?: string; order_number?: string } | null;
-    if (created?.id) emailReceipt(created.id);
+    if (created?.id) {
+      emailReceipt(created.id);
+      creditShareLink(created.id);
+      kickNotifications();
+    }
     void get().hydrate();
     return { success: true, orderNumber: created?.order_number };
   },
@@ -1315,7 +1372,11 @@ export const useGlobalStore = create<AppState>((set, get) => ({
       });
       if (error) return { success: false, error: error.message };
       const created = data as { id?: string; order_number?: string } | null;
-      if (created?.id) emailReceipt(created.id);
+      if (created?.id) {
+        emailReceipt(created.id);
+        creditShareLink(created.id);
+        kickNotifications();
+      }
       firstOrderNumber = firstOrderNumber ?? created?.order_number;
     }
 
@@ -1350,6 +1411,7 @@ export const useGlobalStore = create<AppState>((set, get) => ({
     set((state) => ({
       orders: state.orders.map((o) => (o.id === orderId ? { ...o, status: 'processing' } : o)),
     }));
+    kickNotifications();
   },
 
   shipOrder: async (orderId) => {
@@ -1358,8 +1420,18 @@ export const useGlobalStore = create<AppState>((set, get) => ({
     set((state) => ({
       orders: state.orders.map((o) => (o.id === orderId ? { ...o, status: 'shipped' } : o)),
     }));
+    kickNotifications();
     // Shipping triggers commission/payout crediting server-side — refresh wallets.
     void get().hydrate();
+  },
+
+  deliverOrder: async (orderId) => {
+    const { error } = await supabase.rpc('update_order_status', { p_order_id: orderId, p_status: 'delivered' });
+    if (error) { console.error('Failed to mark order delivered:', error.message); return; }
+    set((state) => ({
+      orders: state.orders.map((o) => (o.id === orderId ? { ...o, status: 'delivered' } : o)),
+    }));
+    kickNotifications();
   },
 
   // Admin approves or revokes a supplier's ability to sell

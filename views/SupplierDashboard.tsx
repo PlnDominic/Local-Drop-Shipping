@@ -20,6 +20,8 @@ import {
   AlertTriangle,
   BadgeCheck,
 } from 'lucide-react';
+import { stockLevel, totalStock } from '../lib/stock';
+import { uploadProductImage } from '../lib/images';
 import { VerificationCard } from '../components/supplier/VerificationCard';
 
 const formatMoney = (amount: number) =>
@@ -83,8 +85,10 @@ export const SupplierDashboard: React.FC = () => {
     addSupplierProductsBulk,
     updateSupplierProductStock,
     updateVariantStock,
+    updateLowStockThreshold,
     fulfillOrder,
     shipOrder,
+    deliverOrder,
     categories,
     wallets,
     currentUserId,
@@ -92,6 +96,8 @@ export const SupplierDashboard: React.FC = () => {
   } = useGlobalStore();
 
   const { profile } = useAuth();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const uid = currentUserId ?? '';
   const businessName = supplierProfile?.businessName || profile?.fullName || 'My Wholesale Store';
 
@@ -387,8 +393,24 @@ export const SupplierDashboard: React.FC = () => {
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
+                {(() => {
+                  const attention = supplierProducts.filter((p) => stockLevel(p) !== 'ok');
+                  if (attention.length === 0) return null;
+                  const out = attention.filter((p) => stockLevel(p) === 'out').length;
+                  return (
+                    <div role="status" className="flex items-start gap-2 bg-amber-50 px-4 py-3 text-[12px] text-amber-800 border-b border-amber-200">
+                      <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" />
+                      <span>
+                        <strong>{attention.length} product{attention.length !== 1 ? 's need' : ' needs'} restocking</strong>
+                        {out > 0 ? ` (${out} sold out)` : ''}: {attention.slice(0, 4).map((p) => p.name).join(', ')}
+                        {attention.length > 4 ? ` and ${attention.length - 4} more` : ''}. Customers cannot order sold-out items.
+                      </span>
+                    </div>
+                  );
+                })()}
                 {supplierProducts.map((p) => {
                   const hasVariants = p.variants.length > 0;
+                  const level = stockLevel(p);
                   const isExpanded = expandedProductId === p.id;
                   return (
                     <div key={p.id}>
@@ -399,6 +421,8 @@ export const SupplierDashboard: React.FC = () => {
                         <div className="min-w-0 flex-1">
                           <h3 className="line-clamp-1 text-[13px] font-bold text-[#151515]">{p.name}</h3>
                           <span className="text-[10px] text-[#999]">SKU {p.sku || '—'}</span>
+                          {level === 'out' && <span className="ml-2 rounded bg-[#f04438]/10 px-1.5 py-0.5 text-[9px] font-black uppercase text-[#c0392b]">Sold out</span>}
+                          {level === 'low' && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-700">Low · {totalStock(p)} left</span>}
                           {hasVariants && (
                             <button
                               type="button"
@@ -428,6 +452,20 @@ export const SupplierDashboard: React.FC = () => {
                             className="w-20 h-9 rounded border border-gray-200 px-2 text-[12px] font-black text-[#151515] focus:outline-none focus:border-[#f04438] disabled:bg-gray-50 disabled:text-gray-400"
                           />
                           <span className="text-[10px] text-[#999]">units</span>
+                        </div>
+                        <div className="flex items-center gap-1.5" title="You are alerted by email/SMS when stock falls to this number">
+                          <span className="text-[10px] text-[#999]">Alert at</span>
+                          <input
+                            type="number"
+                            min={0}
+                            aria-label={`Low stock alert level for ${p.name}`}
+                            value={p.lowStockThreshold ?? 5}
+                            onChange={(e) => {
+                              const n = parseInt(e.target.value);
+                              if (!isNaN(n) && n >= 0) updateLowStockThreshold(p.id, n);
+                            }}
+                            className="w-14 h-9 rounded border border-gray-200 px-2 text-[12px] font-black text-[#151515] focus:outline-none focus:border-[#f04438]"
+                          />
                         </div>
                       </div>
 
@@ -515,6 +553,33 @@ export const SupplierDashboard: React.FC = () => {
                 </div>
                 <div>
                   <label className={labelClass}>Photo URLs (one per line, up to 8)</label>
+                  <label className="mb-2 flex h-10 cursor-pointer items-center justify-center gap-2 rounded border border-dashed border-gray-300 bg-gray-50 text-[11px] font-black text-[#555] hover:border-[#f04438] hover:text-[#f04438]">
+                    <UploadCloud size={14} /> {uploading ? 'Compressing and uploading…' : 'Upload photos from your phone'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      disabled={uploading || !profile}
+                      className="sr-only"
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files ?? []).slice(0, 8);
+                        e.target.value = '';
+                        if (!files.length || !profile) return;
+                        setUploading(true);
+                        setUploadError('');
+                        try {
+                          const urls: string[] = [];
+                          for (const f of files) urls.push(await uploadProductImage(f, profile.id));
+                          setImageUrl((cur) => [cur.trim(), ...urls].filter(Boolean).join('\n'));
+                        } catch (err) {
+                          setUploadError(err instanceof Error ? err.message : 'Upload failed.');
+                        } finally {
+                          setUploading(false);
+                        }
+                      }}
+                    />
+                  </label>
+                  {uploadError && <p role="alert" className="mb-2 text-[11px] font-semibold text-[#c0392b]">{uploadError}</p>}
                   <textarea rows={3} placeholder={'https://... (main photo)\nhttps://... (more angles)'} value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="w-full rounded border border-gray-200 px-3 py-2 text-[12px] focus:outline-none focus:border-[#f04438]" />
                 </div>
                 <div className="flex-1">
@@ -815,6 +880,11 @@ export const SupplierDashboard: React.FC = () => {
                       {o.status === 'processing' && (
                         <button onClick={() => shipOrder(o.id)} className="w-full h-10 rounded bg-[#f04438] text-[11px] font-black text-white hover:bg-[#c0392b] transition-colors flex items-center justify-center gap-1.5">
                           <Truck size={14} /> Ship via GPS
+                        </button>
+                      )}
+                      {o.status === 'shipped' && (
+                        <button onClick={() => deliverOrder(o.id)} className="w-full h-10 rounded bg-[#151515] text-[11px] font-black text-white hover:bg-[#f04438] transition-colors flex items-center justify-center gap-1.5">
+                          <CheckCircle2 size={14} /> Mark delivered
                         </button>
                       )}
                       {['shipped', 'delivered'].includes(o.status) && (

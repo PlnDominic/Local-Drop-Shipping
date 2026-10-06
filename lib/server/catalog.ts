@@ -19,6 +19,15 @@ export interface PageVariant {
   stockQty: number;
 }
 
+export interface PageReview {
+  id: string;
+  rating: number;
+  title: string;
+  body: string;
+  reviewerName: string;
+  createdAt: string;
+}
+
 /** Everything a product page needs. Deliberately excludes wholesale cost. */
 export interface ProductPageData {
   id: string; // the store item id (dropshipper_products.id)
@@ -37,6 +46,9 @@ export interface ProductPageData {
   store: { id: string; name: string; slug: string };
   category: { id: string; name: string; slug: string } | null;
   variants: PageVariant[];
+  /** Verified-buyer reviews (newest first, up to 30) and the overall rating. */
+  rating: { average: number; count: number };
+  reviews: PageReview[];
 }
 
 const cleanSpecs = (raw: unknown): { label: string; value: string }[] =>
@@ -75,12 +87,15 @@ export async function getProductPageData(id: string): Promise<ProductPageData | 
   const p = row.products;
   if (!p || p.is_active === false) return null;
 
-  const [store, supplier, category, variantsRes] = await Promise.all([
+  const [store, supplier, category, variantsRes, statsRes, reviewsRes] = await Promise.all([
     sb.from('dropshipper_profiles').select('id, store_name, store_slug').eq('id', row.dropshipper_id).maybeSingle(),
     sb.from('supplier_profiles').select('*').eq('id', p.supplier_id).maybeSingle(),
     p.category_id ? sb.from('categories').select('id, name, slug').eq('id', p.category_id).maybeSingle() : Promise.resolve({ data: null }),
     // Options are optional (the table exists only after the catalog database update).
     sb.from('product_variants').select('id, label, sku_suffix, price_adjustment, stock_qty').eq('product_id', p.id).eq('is_active', true).order('created_at'),
+    // Reviews are optional too (they arrive with the engagement database update).
+    sb.from('product_rating_stats').select('average, review_count').eq('product_id', p.id).maybeSingle(),
+    sb.from('reviews').select('id, rating, title, body, reviewer_name, created_at').eq('product_id', p.id).order('created_at', { ascending: false }).limit(30),
   ]);
 
   const s = store.data as { id: string; store_name: string | null; store_slug: string | null } | null;
@@ -94,6 +109,18 @@ export async function getProductPageData(id: string): Promise<ProductPageData | 
         skuSuffix: v.sku_suffix ?? '',
         priceAdjustment: Number(v.price_adjustment),
         stockQty: v.stock_qty,
+      }));
+
+  const stats = statsRes.error ? null : (statsRes.data as { average: number | string; review_count: number } | null);
+  const reviews: PageReview[] = reviewsRes.error
+    ? []
+    : ((reviewsRes.data ?? []) as { id: string; rating: number; title: string; body: string; reviewer_name: string; created_at: string }[]).map((r) => ({
+        id: r.id,
+        rating: r.rating,
+        title: r.title,
+        body: r.body,
+        reviewerName: r.reviewer_name,
+        createdAt: r.created_at,
       }));
 
   return {
@@ -113,6 +140,8 @@ export async function getProductPageData(id: string): Promise<ProductPageData | 
     store: { id: row.dropshipper_id, name: s?.store_name ?? '', slug: s?.store_slug ?? '' },
     category: cat,
     variants,
+    rating: { average: stats ? Number(stats.average) : 0, count: stats?.review_count ?? 0 },
+    reviews,
   };
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { ReceiptButton } from '../components/ReceiptButton';
+import { SharePanel } from '../components/share/SharePanel';
 import React, { useRef, useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
 import type { Product } from '../store/globalStore';
@@ -36,7 +37,7 @@ import { supabase } from '../lib/supabase/client';
 const formatMoney = (amount: number) =>
   `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
-type Tab = 'overview' | 'import' | 'my-store' | 'customize' | 'orders' | 'wallet';
+type Tab = 'overview' | 'import' | 'my-store' | 'share' | 'customize' | 'orders' | 'wallet';
 
 export const DropshipperDashboard: React.FC = () => {
   const {
@@ -247,6 +248,7 @@ export const DropshipperDashboard: React.FC = () => {
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
     { id: 'import', label: 'Import Products', icon: PlusCircle },
     { id: 'my-store', label: 'My Store', icon: ShoppingBag },
+    { id: 'share', label: 'Share & Track', icon: Share2 },
     { id: 'customize', label: 'Customize Store', icon: Palette },
     { id: 'orders', label: 'Orders', icon: FileText },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
@@ -530,6 +532,8 @@ export const DropshipperDashboard: React.FC = () => {
         )}
 
         {/* ── CUSTOMIZE STORE ── */}
+        {activeTab === 'share' && <SharePanel />}
+
         {activeTab === 'customize' && (
           <form onSubmit={handleSaveCustomization} className="space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded border border-gray-100">

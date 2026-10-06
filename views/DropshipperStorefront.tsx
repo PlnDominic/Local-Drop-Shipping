@@ -1,5 +1,6 @@
 'use client';
 
+import { OptimizedImage } from '../components/ui/OptimizedImage';
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { DeliveryFields } from '../components/checkout/DeliveryFields';
@@ -83,10 +84,10 @@ const ProductCard: React.FC<{
         />
         <Link href={href} className="flex h-full w-full items-center justify-center" aria-label={product.product.name}>
           {product.product.images[0] ? (
-            <img
+            <OptimizedImage
               src={product.product.images[0]}
               alt={product.product.name}
-              loading="lazy"
+              width={300}
               className="h-full w-full object-contain p-4 mix-blend-multiply transition-transform duration-500 group-hover:scale-105"
             />
           ) : (

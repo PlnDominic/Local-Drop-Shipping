@@ -5,7 +5,7 @@ const tseslint = require('typescript-eslint')
 
 module.exports = [
   {
-    ignores: ['dist', '.next', 'next-env.d.ts'],
+    ignores: ['dist', '.next', 'next-env.d.ts', 'public/sw.js'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

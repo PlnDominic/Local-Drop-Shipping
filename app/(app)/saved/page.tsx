@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { OptimizedImage } from '../../../components/ui/OptimizedImage';
 import { Heart, Package } from 'lucide-react';
 import { useAuth } from '../../../lib/auth/AuthProvider';
 import { useGlobalStore } from '../../../store/globalStore';
@@ -60,7 +61,7 @@ export default function SavedItemsPage() {
                     <SaveButton dropshipperProductId={item.id} className="absolute right-2 top-2 z-10" />
                     <Link href={`/product/${item.id}`} className="flex h-full w-full items-center justify-center" aria-label={item.product.name}>
                       {item.product.images[0] ? (
-                        <img src={item.product.images[0]} alt={item.product.name} loading="lazy" className="h-full w-full object-contain p-4 mix-blend-multiply" />
+                        <OptimizedImage src={item.product.images[0]} alt={item.product.name} width={300} className="h-full w-full object-contain p-4 mix-blend-multiply" />
                       ) : (
                         <Package size={36} className="text-gray-300" />
                       )}

@@ -1,5 +1,7 @@
 'use client';
 
+import { DataSaverToggle } from './DataSaverToggle';
+import { InstallButton } from './InstallButton';
 import React, { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -254,6 +256,13 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
                         >
                           Support
                         </Link>
+                        <Link
+                          href="/settings/notifications"
+                          onClick={() => setAccountOpen(false)}
+                          className="block w-full px-4 py-2 text-left text-[12px] font-semibold text-[#333] hover:bg-[#f5f5f5]"
+                        >
+                          Notifications
+                        </Link>
                         <button
                           type="button"
                           onClick={async () => { setAccountOpen(false); await signOut(); router.push('/'); }}
@@ -332,9 +341,9 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
             </Link>
           ))}
 
-          <div className="ml-auto items-center gap-2 text-[#f04438] font-black hidden md:flex">
-            <Zap size={14} />
-            Special Offer Today!
+          <div className="ml-auto flex items-center gap-4 text-[11px] font-bold">
+            <InstallButton />
+            <DataSaverToggle />
           </div>
         </div>
 

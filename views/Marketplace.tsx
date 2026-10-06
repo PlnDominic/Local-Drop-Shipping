@@ -32,9 +32,11 @@ import { SaveButton } from '../components/SaveButton';
 import { buildIndex, runSearch } from '../lib/search';
 import { buildHeaderCategories } from '../lib/categories';
 import { useGlobalStore } from '../store/globalStore';
-import type { DropshipperProduct, ProductReview } from '../store/globalStore';
+import type { DropshipperProduct, Product } from '../store/globalStore';
 import { useToast } from '../components/Toast';
 import { SiteHeader } from '../components/SiteHeader';
+import { OptimizedImage } from '../components/ui/OptimizedImage';
+import { stockLevel, totalStock } from '../lib/stock';
 
 const heroImage =
   'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=90';
@@ -69,10 +71,7 @@ const getCategoryLabel = (categoryId: string) => {
   }
 };
 
-const computeAvgRating = (reviews: ProductReview[]): number => {
-  if (!reviews || reviews.length === 0) return 0;
-  return reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
-};
+const ratingOf = (p: Product): number => p.ratingAvg ?? 0;
 
 const StarDisplay: React.FC<{ rating: number; size?: number }> = ({ rating, size = 13 }) => (
   <span className="inline-flex items-center gap-0.5">
@@ -105,20 +104,21 @@ const ProductCard: React.FC<{
   onAddToCart: (id: string) => void;
   horizontal?: boolean;
 }> = ({ product, onAddToCart, horizontal = false }) => {
-  const reviews = product.product.reviews || [];
-  const avgRating = computeAvgRating(reviews);
+  const reviewCount = product.product.ratingCount ?? 0;
+  const avgRating = ratingOf(product.product);
   const href = `/product/${product.id}`;
   const image = product.product.images[0];
   const categoryName =
     useGlobalStore((s) => s.categories.find((c) => c.id === product.product.categoryId)?.name) ??
     getCategoryLabel(product.product.categoryId);
   const hasOptions = product.product.variants.length > 0;
+  const stock = stockLevel(product.product);
   const discount = product.product.suggestedPrice > product.sellingPrice
     ? Math.round(((product.product.suggestedPrice - product.sellingPrice) / product.product.suggestedPrice) * 100)
     : 0;
 
   const picture = image ? (
-    <img src={image} alt={product.product.name} loading="lazy" className="h-full w-full object-contain p-1 mix-blend-multiply" />
+    <OptimizedImage src={image} alt={product.product.name} width={80} className="h-full w-full object-contain p-1 mix-blend-multiply" />
   ) : (
     <Package size={22} className="text-gray-300" />
   );
@@ -148,13 +148,19 @@ const ProductCard: React.FC<{
             -{discount}%
           </span>
         )}
+        {stock === 'out' && (
+          <span className="absolute left-2 bottom-2 z-10 bg-[#151515] px-2 py-0.5 text-[10px] font-black text-white rounded">Sold out</span>
+        )}
+        {stock === 'low' && (
+          <span className="absolute left-2 bottom-2 z-10 bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white rounded">Only {totalStock(product.product)} left</span>
+        )}
         <SaveButton dropshipperProductId={product.id} className="absolute right-2 top-2 z-10" />
         <Link href={href} className="flex h-full w-full items-center justify-center" aria-label={product.product.name}>
           {image ? (
-                    <img
+            <OptimizedImage
               src={image}
               alt={product.product.name}
-              loading="lazy"
+              width={300}
               className="h-full w-full object-contain p-4 mix-blend-multiply transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
@@ -170,10 +176,10 @@ const ProductCard: React.FC<{
         <p className="mt-1 text-[10px] text-[#999] truncate">
           <SupplierName supplierId={product.product.supplierId} name={product.product.supplierName} />
         </p>
-        {reviews.length > 0 && (
+        {reviewCount > 0 && (
           <div className="mt-1 flex items-center gap-1">
             <StarDisplay rating={avgRating} size={10} />
-            <span className="text-[10px] text-[#999]">({reviews.length})</span>
+            <span className="text-[10px] text-[#999]">({reviewCount})</span>
           </div>
         )}
         <div className="mt-2 flex items-center gap-2">
@@ -195,10 +201,11 @@ const ProductCard: React.FC<{
         ) : (
           <button
             type="button"
+            disabled={stock === 'out'}
             onClick={() => onAddToCart(product.id)}
-            className="mt-3 w-full h-9 rounded bg-[#151515] text-[11px] font-black text-white transition-colors hover:bg-[#f04438]"
+            className="mt-3 w-full h-9 rounded bg-[#151515] text-[11px] font-black text-white transition-colors hover:bg-[#f04438] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:hover:bg-gray-300"
           >
-            Add to Cart
+            {stock === 'out' ? 'Sold out' : 'Add to Cart'}
           </button>
         )}
       </div>
@@ -333,7 +340,7 @@ export const Marketplace: React.FC = () => {
       const matchesCategory = activeCategory === 'all' || item.product.categoryId === activeCategory;
       const matchesMinPrice = minPriceNum === null || isNaN(minPriceNum) || item.sellingPrice >= minPriceNum;
       const matchesMaxPrice = maxPriceNum === null || isNaN(maxPriceNum) || item.sellingPrice <= maxPriceNum;
-      const matchesRating = minRating === 0 || computeAvgRating(item.product.reviews || []) >= minRating;
+      const matchesRating = minRating === 0 || ratingOf(item.product) >= minRating;
       const stockAvailable = item.product.variants.length > 0
         ? item.product.variants.some((v) => v.stockQty > 0)
         : item.product.stockQty > 0;
@@ -347,7 +354,7 @@ export const Marketplace: React.FC = () => {
       case 'newest': return [...result].sort((a, b) => when(b) - when(a));
       case 'price_asc': return [...result].sort((a, b) => a.sellingPrice - b.sellingPrice);
       case 'price_desc': return [...result].sort((a, b) => b.sellingPrice - a.sellingPrice);
-      case 'rating': return [...result].sort((a, b) => computeAvgRating(b.product.reviews || []) - computeAvgRating(a.product.reviews || []));
+      case 'rating': return [...result].sort((a, b) => ratingOf(b.product) - ratingOf(a.product));
       default: return result; // best match when searching, otherwise newest first (database order)
     }
   }, [searched, activeCategory, sort, minPriceNum, maxPriceNum, minRating, inStockOnly, verifiedOnly, verifiedSupplierIds]);
@@ -379,7 +386,7 @@ export const Marketplace: React.FC = () => {
 
   const topRated = useMemo(
     () => [...catalogProducts]
-      .sort((a, b) => computeAvgRating(b.product.reviews || []) - computeAvgRating(a.product.reviews || []))
+      .sort((a, b) => ratingOf(b.product) - ratingOf(a.product))
       .slice(0, 6),
     [catalogProducts]
   );

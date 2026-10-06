@@ -1,3 +1,4 @@
+import { kickNotifications } from '../notifications';
 import { supabase } from './client';
 import { POLICY } from '../site';
 
@@ -34,7 +35,7 @@ export interface MyOrder {
   total: number;
   deliveryMinDays: number | null;
   deliveryMaxDays: number | null;
-  items: { id: string; name: string; quantity: number; unitPrice: number; image?: string }[];
+  items: { id: string; name: string; quantity: number; unitPrice: number; image?: string; reviewHref?: string }[];
   refund: RefundRequest | null;
 }
 
@@ -55,8 +56,10 @@ interface OrderRow {
   delivery_min_days: number | null;
   delivery_max_days: number | null;
   dropshipper_profiles?: { store_name: string | null } | null;
+  dropshipper_id: string;
   order_items?: {
     id: string;
+    product_id: string;
     quantity: number;
     unit_price: number | string;
     products?: { name: string; images: string[] | null } | null;
@@ -78,7 +81,7 @@ interface RefundRow {
 export async function getMyOrders(userId: string): Promise<MyOrder[]> {
   const { data, error } = await supabase
     .from('orders')
-    .select('*, dropshipper_profiles(store_name), order_items(id, quantity, unit_price, products(name, images))')
+    .select('*, dropshipper_profiles(store_name), order_items(id, product_id, quantity, unit_price, products(name, images))')
     .eq('customer_id', userId)
     .order('created_at', { ascending: false })
     .limit(100);
@@ -108,6 +111,20 @@ export async function getMyOrders(userId: string): Promise<MyOrder[]> {
     }
   }
 
+  // Delivered items link to their product page so the customer can rate them.
+  const storeItem = new Map<string, string>();
+  const delivered = rows.filter((r) => r.status === 'delivered');
+  if (delivered.length) {
+    const { data: dps } = await supabase
+      .from('dropshipper_products')
+      .select('id, dropshipper_id, product_id')
+      .in('dropshipper_id', [...new Set(delivered.map((r) => r.dropshipper_id))])
+      .in('product_id', [...new Set(delivered.flatMap((r) => (r.order_items ?? []).map((i) => i.product_id)))]);
+    for (const d of (dps as { id: string; dropshipper_id: string; product_id: string }[] | null) ?? []) {
+      storeItem.set(`${d.dropshipper_id}:${d.product_id}`, d.id);
+    }
+  }
+
   return rows.map((o) => ({
     id: o.id,
     orderNumber: o.order_number ?? o.id.slice(0, 8).toUpperCase(),
@@ -131,6 +148,9 @@ export async function getMyOrders(userId: string): Promise<MyOrder[]> {
       quantity: it.quantity,
       unitPrice: Number(it.unit_price),
       image: it.products?.images?.[0],
+      reviewHref: storeItem.has(`${o.dropshipper_id}:${it.product_id}`)
+        ? `/product/${storeItem.get(`${o.dropshipper_id}:${it.product_id}`)}#reviews-heading`
+        : undefined,
     })),
     refund: refunds.get(o.id) ?? null,
   }));
@@ -139,6 +159,7 @@ export async function getMyOrders(userId: string): Promise<MyOrder[]> {
 export async function cancelMyOrder(orderId: string, reason: string): Promise<void> {
   const { error } = await supabase.rpc('cancel_order', { p_order_id: orderId, p_reason: reason || null });
   if (error) throw error;
+  kickNotifications();
 }
 
 export async function requestOrderRefund(orderId: string, kind: RefundKind, reason: string): Promise<void> {
