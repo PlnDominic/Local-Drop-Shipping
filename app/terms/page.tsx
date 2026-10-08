@@ -56,8 +56,9 @@ export default function TermsPage() {
       <LegalSection title="5. Dropshippers: commissions and wallet">
         <ul>
           <li>Your commission on an order is the selling price minus the supplier&apos;s wholesale cost, for the items in that order.</li>
+          <li>Your commission is worked out from the supplier&apos;s cost at the time the customer ordered, so a later price change does not affect orders already placed.</li>
           <li>Commission is credited to your wallet when an order is marked as shipped. If that order is later cancelled or refunded, the commission is taken back from your wallet. If you have already withdrawn it, your balance can go below zero and you cannot withdraw until it is cleared by future earnings.</li>
-          <li>Withdrawals are paid to the mobile money account you provide. You are responsible for entering the correct number.</li>
+          <li>When you request a withdrawal, the amount is set aside from your wallet straight away. We review each request and then send it to the mobile money account you provide. You can cancel a request until it has been reviewed. If we decline a request or the transfer fails, the amount goes back to your wallet. Minimum and maximum amounts and any payout fee are shown before you confirm. You are responsible for entering the correct number and account name.</li>
           <li>Do not sell below the supplier&apos;s cost, publish false claims about products, or place orders on your own store to collect commission.</li>
         </ul>
       </LegalSection>
@@ -66,7 +67,7 @@ export default function TermsPage() {
         <ul>
           <li>Suppliers must be approved by us before their products can be sold. We may also ask for identity and business documents (such as a Ghana Card and business registration) before awarding a <strong>Verified</strong> badge. We may refuse or withdraw approval or the badge at our discretion, for example for false documents or repeated complaints.</li>
           <li>You must stock what you list, pack orders promptly, mark them shipped only when they are actually dispatched, and describe products honestly.</li>
-          <li>Your payout for an order is credited when it is marked shipped and is taken back if the order is cancelled or refunded.</li>
+          <li>Your payout for an order is based on your cost at the time the customer ordered. It is credited to your wallet when the order is marked shipped and is taken back if the order is cancelled or refunded. You withdraw it to mobile money on the same terms as dropshippers (section 5).</li>
           <li>Counterfeit, stolen, unsafe or illegal goods are strictly prohibited, as are goods whose sale is restricted in Ghana without the required permits.</li>
         </ul>
       </LegalSection>

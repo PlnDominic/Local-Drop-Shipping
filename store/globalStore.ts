@@ -270,7 +270,6 @@ interface AppState {
   togglePublishProduct: (dropshipperProductId: string) => void;
   updateImportedPrice: (dropshipperProductId: string, price: number) => void;
   removeImportedProduct: (dropshipperProductId: string) => void;
-  withdrawFunds: (userId: string, amount: number, details: string) => Promise<boolean>;
 
   // Customer Actions
   /** Places an order against a single dropshipper's store (e.g. from a storefront cart). */
@@ -1297,32 +1296,6 @@ export const useGlobalStore = create<AppState>((set, get) => ({
           : dp
       ),
     }));
-  },
-
-  withdrawFunds: async (userId, amount, details) => {
-    const state = get();
-    const wallet = state.wallets[userId];
-    if (!wallet || wallet.balance < amount || amount <= 0) return false;
-
-    const { data: newBalance, error } = await supabase.rpc('wallet_withdraw', {
-      p_amount: amount,
-      p_account: { details },
-    });
-
-    if (error) {
-      console.error('Withdrawal failed:', error.message);
-      return false;
-    }
-
-    set((s) => ({
-      wallets: {
-        ...s.wallets,
-        [userId]: { ...s.wallets[userId], balance: Number(newBalance) },
-      },
-    }));
-    // Refresh the transaction history so the new withdrawal shows up.
-    void get().hydrate();
-    return true;
   },
 
   /** Places an order against a single dropshipper's store; used by storefront checkouts. */

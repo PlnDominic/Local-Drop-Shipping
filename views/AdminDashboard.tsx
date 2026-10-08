@@ -11,6 +11,8 @@ import { SupportPanel } from '../components/admin/SupportPanel';
 import { DeliveryZonesPanel } from '../components/admin/DeliveryZonesPanel';
 import { PaymentsPanel } from '../components/admin/PaymentsPanel';
 import { NotificationsPanel } from '../components/admin/NotificationsPanel';
+import { PayoutsPanel } from '../components/admin/PayoutsPanel';
+import { AuditLogPanel } from '../components/admin/AuditLogPanel';
 import { getAdminCounts } from '../lib/supabase/adminCounts';
 import { useAuth } from '../lib/auth/AuthProvider';
 import {
@@ -34,6 +36,8 @@ import {
   BadgeCheck,
   LifeBuoy,
   CreditCard,
+  Banknote,
+  ScrollText,
 } from 'lucide-react';
 
 const formatMoney = (amount: number) =>
@@ -42,7 +46,7 @@ const formatMoney = (amount: number) =>
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-type Tab = 'wishlist' | 'refunds' | 'verification' | 'support' | 'delivery' | 'notifications' | 'payments' | 'overview' | 'suppliers' | 'dropshippers' | 'orders' | 'revenue' | 'users' | 'activity';
+type Tab = 'wishlist' | 'refunds' | 'payouts' | 'verification' | 'support' | 'delivery' | 'notifications' | 'payments' | 'overview' | 'suppliers' | 'dropshippers' | 'orders' | 'revenue' | 'users' | 'activity' | 'audit';
 
 const STATUS_STYLE: Record<Order['status'], string> = {
   pending: 'bg-yellow-50 text-yellow-700',
@@ -68,7 +72,7 @@ export const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('wishlist');
   const [wishlistPending, setWishlistPending] = useState(0);
   const { profile } = useAuth();
-  const [adminCounts, setAdminCounts] = useState({ refunds: 0, verifications: 0, tickets: 0 });
+  const [adminCounts, setAdminCounts] = useState({ refunds: 0, verifications: 0, tickets: 0, payouts: 0 });
   const refreshCounts = useCallback(() => {
     getAdminCounts().then(setAdminCounts).catch(() => undefined);
   }, []);
@@ -150,6 +154,7 @@ export const AdminDashboard: React.FC = () => {
   const tabs: { id: Tab; label: string; icon: typeof LayoutGrid; badge?: number }[] = [
     { id: 'wishlist', label: 'Wishlist', icon: Heart, badge: wishlistPending },
     { id: 'refunds', label: 'Refunds', icon: RotateCcw, badge: adminCounts.refunds },
+    { id: 'payouts', label: 'Payouts', icon: Banknote, badge: adminCounts.payouts },
     { id: 'verification', label: 'Verification', icon: BadgeCheck, badge: adminCounts.verifications },
     { id: 'support', label: 'Support', icon: LifeBuoy, badge: adminCounts.tickets },
     { id: 'delivery', label: 'Delivery', icon: Truck },
@@ -162,6 +167,7 @@ export const AdminDashboard: React.FC = () => {
     { id: 'revenue', label: 'Revenue', icon: TrendingUp },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'activity', label: 'Activity', icon: Bell },
+    { id: 'audit', label: 'Audit log', icon: ScrollText },
   ];
 
   const SupplierRow: React.FC<{ sp: SupplierProfile }> = ({ sp }) => (
@@ -256,6 +262,8 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         {activeTab === 'refunds' && <RefundsPanel onChanged={refreshCounts} />}
+        {activeTab === 'payouts' && <PayoutsPanel onChanged={refreshCounts} />}
+        {activeTab === 'audit' && <AuditLogPanel />}
         {activeTab === 'verification' && <VerificationsPanel onChanged={refreshCounts} />}
         {activeTab === 'support' && profile && <SupportPanel adminId={profile.id} onChanged={refreshCounts} />}
         {activeTab === 'delivery' && <DeliveryZonesPanel />}

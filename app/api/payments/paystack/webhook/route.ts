@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
 import { validSignature } from '../../../../../lib/server/paystack';
 import { settlePayment } from '../../../../../lib/server/payments';
+import { settlePayoutFromWebhook } from '../../../../../lib/server/payouts';
 import { dispatchNotifications } from '../../../../../lib/server/notify/dispatch';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Paystack calls this when a charge completes, even if the customer closed their browser.
+ * Paystack calls this when a charge completes, even if the customer closed their browser, and
+ * when a withdrawal transfer succeeds, fails or is reversed.
  * Set the URL in Paystack: Settings > API Keys & Webhooks > Live Webhook URL.
- * The signature proves it came from Paystack, and we still re-check the transaction with Paystack.
+ * The signature proves it came from Paystack, and we still re-check with Paystack before recording.
  */
 export async function POST(req: Request) {
   const raw = await req.text();
@@ -25,6 +27,12 @@ export async function POST(req: Request) {
       // Let Paystack retry if we could not record it.
       if (result === 'error') return NextResponse.json({ received: false }, { status: 500 });
       if (result === 'paid') void dispatchNotifications(25).catch(() => undefined);
+    }
+    const isTransferEvent = event.event === 'transfer.success' || event.event === 'transfer.failed' || event.event === 'transfer.reversed';
+    if (isTransferEvent && reference && /^wdr-/.test(reference)) {
+      const result = await settlePayoutFromWebhook(reference);
+      if (result === 'error') return NextResponse.json({ received: false }, { status: 500 });
+      if (result === 'ok') void dispatchNotifications(25).catch(() => undefined);
     }
   } catch {
     return NextResponse.json({ received: false }, { status: 400 });

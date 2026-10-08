@@ -19,15 +19,17 @@ import {
   Download,
   AlertTriangle,
   BadgeCheck,
+  Wallet,
 } from 'lucide-react';
 import { stockLevel, totalStock } from '../lib/stock';
 import { uploadProductImage } from '../lib/images';
 import { VerificationCard } from '../components/supplier/VerificationCard';
+import { WalletPanel } from '../components/wallet/WalletPanel';
 
 const formatMoney = (amount: number) =>
   `GHS ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
-type Tab = 'products' | 'upload' | 'bulk' | 'orders' | 'verification';
+type Tab = 'products' | 'upload' | 'bulk' | 'orders' | 'wallet' | 'verification';
 
 // New-product form's working shape for a not-yet-saved variant row.
 type DraftVariant = { label: string; skuSuffix: string; priceAdjustment: string; stockQty: string };
@@ -281,6 +283,7 @@ export const SupplierDashboard: React.FC = () => {
     { id: 'upload', label: 'Upload Item', icon: Plus },
     { id: 'bulk', label: 'Bulk Import', icon: UploadCloud },
     { id: 'orders', label: 'Fulfillment', icon: Truck, badge: pendingCount },
+    { id: 'wallet', label: 'Wallet', icon: Wallet },
     { id: 'verification', label: 'Verification', icon: BadgeCheck },
   ];
 
@@ -314,7 +317,7 @@ export const SupplierDashboard: React.FC = () => {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded bg-white/5 border border-white/10 px-4 py-3">
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Escrow</p>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Wallet</p>
               <p className="text-lg font-black text-white">{formatMoney(wallet.balance)}</p>
             </div>
             <div className="rounded bg-white/5 border border-white/10 px-4 py-3">
@@ -356,6 +359,10 @@ export const SupplierDashboard: React.FC = () => {
       <div className="max-w-[1280px] mx-auto px-4 py-5 space-y-4">
 
         {activeTab === 'verification' && <VerificationCard />}
+
+        {activeTab === 'wallet' && (
+          <WalletPanel intro="Your payout for each order is added when it ships. Withdraw it to MTN MoMo, Telecel Cash or AT Money." />
+        )}
 
         {/* ── PRODUCTS ── */}
         {activeTab === 'products' && (

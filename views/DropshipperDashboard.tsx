@@ -2,6 +2,7 @@
 
 import { ReceiptButton } from '../components/ReceiptButton';
 import { SharePanel } from '../components/share/SharePanel';
+import { WalletPanel } from '../components/wallet/WalletPanel';
 import React, { useRef, useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
 import type { Product } from '../store/globalStore';
@@ -16,11 +17,8 @@ import {
   ArrowRight,
   Trash2,
   X,
-  AlertCircle,
   CheckCircle2,
   Search,
-  Package,
-  TrendingUp,
   Share2,
   Palette,
   Sparkles,
@@ -49,8 +47,6 @@ export const DropshipperDashboard: React.FC = () => {
     removeImportedProduct,
     orders,
     wallets,
-    withdrawFunds,
-    transactions,
     currentUserId,
     dropshipperProfile,
   } = useGlobalStore();
@@ -176,13 +172,6 @@ export const DropshipperDashboard: React.FC = () => {
   // Catalog filter
   const [query, setQuery] = useState('');
 
-  // Wallet state
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [momoProvider, setMomoProvider] = useState('MTN MoMo');
-  const [momoPhone, setMomoPhone] = useState('');
-  const [withdrawSuccess, setWithdrawSuccess] = useState(false);
-  const [withdrawError, setWithdrawError] = useState('');
-
   // Derived data
   const importedProductIds = dropshipperProducts.map((dp) => dp.productId);
   const availableToImport = products
@@ -214,35 +203,6 @@ export const DropshipperDashboard: React.FC = () => {
     showToast('Product imported to your store!', 'success');
   };
 
-  const [withdrawing, setWithdrawing] = useState(false);
-
-  const handleWithdrawal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setWithdrawError('');
-    setWithdrawSuccess(false);
-
-    const amt = parseFloat(withdrawAmount);
-    if (isNaN(amt) || amt <= 0) {
-      setWithdrawError('Enter a valid amount.');
-      return;
-    }
-    if (amt > wallet.balance) {
-      setWithdrawError('Insufficient balance.');
-      return;
-    }
-
-    setWithdrawing(true);
-    const success = await withdrawFunds(uid, amt, `${momoProvider} (${momoPhone})`);
-    setWithdrawing(false);
-    if (success) {
-      setWithdrawSuccess(true);
-      setWithdrawAmount('');
-      showToast('Withdrawal successful!', 'success');
-    } else {
-      setWithdrawError('Withdrawal transaction failed.');
-      showToast('Withdrawal failed', 'error');
-    }
-  };
 
   const tabs: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
@@ -926,137 +886,7 @@ export const DropshipperDashboard: React.FC = () => {
 
         {/* ── WALLET ── */}
         {activeTab === 'wallet' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 space-y-4">
-              {/* Withdraw */}
-              <section className="bg-white rounded border border-gray-100 overflow-hidden">
-                <div className="border-b border-gray-100 px-4 py-4">
-                  <h2 className="text-[15px] font-black text-[#151515]">Withdraw via Mobile Money</h2>
-                  <p className="text-[11px] text-[#888]">Pull commissions to MTN MoMo, Telecel Cash, or your bank.</p>
-                </div>
-                <form onSubmit={handleWithdrawal} className="p-5 space-y-4">
-                  {withdrawError && (
-                    <div className="flex items-center gap-1.5 rounded bg-red-50 px-3 py-2.5 text-[11px] text-red-700 border border-red-100">
-                      <AlertCircle size={14} /> <span>{withdrawError}</span>
-                    </div>
-                  )}
-                  {withdrawSuccess && (
-                    <div className="flex items-center gap-1.5 rounded bg-[#f04438]/10 px-3 py-2.5 text-[11px] text-[#c0392b] border border-[#f04438]/20">
-                      <CheckCircle2 size={14} /> <span>Withdrawal processed!</span>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] text-[#777] font-bold mb-1 uppercase tracking-wider">Provider</label>
-                      <select
-                        value={momoProvider}
-                        onChange={(e) => setMomoProvider(e.target.value)}
-                        className="w-full h-10 rounded border border-gray-200 px-3 text-[12px] font-semibold focus:outline-none focus:border-[#f04438] bg-white"
-                      >
-                        <option>MTN MoMo</option>
-                        <option>Telecel Cash</option>
-                        <option>AirtelTigo Money</option>
-                        <option>GCB Bank Account</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-[#777] font-bold mb-1 uppercase tracking-wider">Phone / Account</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="+233 ..."
-                        value={momoPhone}
-                        onChange={(e) => setMomoPhone(e.target.value)}
-                        className="w-full h-10 rounded border border-gray-200 px-3 text-[12px] font-semibold focus:outline-none focus:border-[#f04438]"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] text-[#777] font-bold mb-1 uppercase tracking-wider">Amount (GHS)</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] font-black text-[#777]">₵</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max={wallet.balance}
-                        required
-                        placeholder="e.g. 200"
-                        value={withdrawAmount}
-                        onChange={(e) => setWithdrawAmount(e.target.value)}
-                        className="w-full h-10 rounded border border-gray-200 pl-7 pr-4 text-[12px] font-black text-[#f04438] focus:outline-none focus:border-[#f04438]"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={withdrawing}
-                    className="w-full h-11 rounded bg-[#151515] text-[12px] font-black text-white hover:bg-[#f04438] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
-                  >
-                    <Wallet size={15} /> {withdrawing ? 'Processing…' : 'Withdraw Funds'}
-                  </button>
-                </form>
-              </section>
-
-              {/* History */}
-              <section className="bg-white rounded border border-gray-100 overflow-hidden">
-                <div className="border-b border-gray-100 px-4 py-4">
-                  <h2 className="text-[15px] font-black text-[#151515]">Payout History</h2>
-                </div>
-                <div className="p-4">
-                  {transactions.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center border border-dashed border-gray-200 rounded p-12 text-center">
-                      <Package size={32} className="text-gray-300 mb-3" />
-                      <p className="text-[12px] text-[#777]">No transactions yet.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {transactions.map((tx) => {
-                        const negative = tx.type === 'withdrawal' || tx.type === 'debit';
-                        return (
-                          <div key={tx.id} className="flex justify-between items-center rounded bg-[#f7f7f7] px-4 py-3">
-                            <div className="min-w-0">
-                              <strong className="block text-[12px] font-bold text-[#151515] truncate">{tx.description}</strong>
-                              <span className="text-[10px] text-[#999]">{tx.reference} · {new Date(tx.createdAt).toLocaleString()}</span>
-                            </div>
-                            <strong className={`text-[13px] font-black ${negative ? 'text-gray-500' : 'text-[#f04438]'}`}>
-                              {negative ? '-' : '+'}{formatMoney(Math.abs(tx.amount))}
-                            </strong>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </section>
-            </div>
-
-            {/* Summary sidebar */}
-            <div className="space-y-4">
-              <div className="bg-[#151515] text-white rounded p-5 space-y-4">
-                <div className="flex items-center gap-1.5 text-[#f04438]">
-                  <TrendingUp size={16} />
-                  <h3 className="text-[12px] font-black uppercase tracking-wider">Wallet</h3>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Available</p>
-                  <p className="text-2xl font-black">{formatMoney(wallet.balance)}</p>
-                </div>
-                <div className="space-y-2 border-t border-white/10 pt-3 text-[12px]">
-                  <div className="flex justify-between text-gray-400">
-                    <span>Total earned</span>
-                    <strong className="text-white">{formatMoney(wallet.totalEarned)}</strong>
-                  </div>
-                  <div className="flex justify-between text-gray-400">
-                    <span>Withdrawn</span>
-                    <strong className="text-white">{formatMoney(Math.max(0, wallet.totalEarned - wallet.balance))}</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <WalletPanel intro="Commissions are added when an order ships. Withdraw them to MTN MoMo, Telecel Cash or AT Money." />
         )}
       </div>
 
