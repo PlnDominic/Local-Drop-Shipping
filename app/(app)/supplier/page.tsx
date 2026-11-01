@@ -1,17 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
-import { Building2, Clock3, Mail, MapPin } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useAuth } from '../../../lib/auth/AuthProvider';
 import { useGlobalStore } from '../../../store/globalStore';
 import { SupplierDashboard } from '../../../views/SupplierDashboard';
 import { SupplierRegister } from '../../../views/SupplierRegister';
 import { supabase } from '../../../lib/supabase/client';
+import { Field, IdentityStep, OnboardingShell, ReviewStep, textInput, useMyVerification } from '../../../components/onboarding/Onboarding';
 
-const inputClass =
-  'w-full h-11 rounded border border-gray-200 px-3 text-[13px] focus:outline-none focus:border-[#f04438]';
-const labelClass = 'block text-[10px] text-[#777] font-bold mb-1 uppercase tracking-wider';
+const STEPS = ['Your business', 'Verify identity', 'Review'];
 
 /** Business-details form shared by "finish your profile" and "apply as a supplier" states. */
 const SupplierProfileForm: React.FC<{ becomingSupplier: boolean }> = ({ becomingSupplier }) => {
@@ -63,93 +61,83 @@ const SupplierProfileForm: React.FC<{ becomingSupplier: boolean }> = ({ becoming
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] font-sans flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        <div className="flex items-center gap-2 mb-6">
-          <Link href="/marketplace" className="flex items-center gap-1 text-[12px] text-[#777] hover:text-[#151515]">
-            Back to marketplace
-          </Link>
-        </div>
+    <OnboardingShell
+      steps={STEPS}
+      current={0}
+      title={becomingSupplier ? 'Become a supplier' : 'Tell us about your business'}
+      subtitle="List wholesale products for dropshippers across Ghana. Next we'll verify your identity, then our team approves your account before you go live."
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && <p role="alert" className="rounded-lg bg-[#fff1f0] px-3 py-2.5 text-[13px] text-[#912018]">{error}</p>}
 
-        <h2 className="text-[24px] font-black text-[#151515]">
-          {becomingSupplier ? 'Become a Supplier' : 'Finish your business profile'}
-        </h2>
-        <p className="text-[13px] text-[#888] mt-1 mb-6">
-          {becomingSupplier
-            ? 'List wholesale products for dropshippers across Ghana. Your application will be reviewed before you can go live.'
-            : 'One last step — tell us about your business before your application is reviewed.'}
-        </p>
+        <Field label="Business name" htmlFor="sb-name">
+          <input id="sb-name" type="text" required value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Bhra Joe Wholesale" className={textInput} />
+        </Field>
+        <Field label="Business registration number" htmlFor="sb-reg" hint="Optional. Leave blank if you trade as an individual.">
+          <input id="sb-reg" type="text" value={businessRegNumber} onChange={(e) => setBusinessRegNumber(e.target.value)} placeholder="e.g. BN123456789" className={textInput} />
+        </Field>
+        <Field label="Region" htmlFor="sb-region">
+          <input id="sb-region" type="text" required value={region} onChange={(e) => setRegion(e.target.value)} placeholder="e.g. Greater Accra" className={textInput} />
+        </Field>
+        <Field label="What do you sell?" htmlFor="sb-desc">
+          <textarea
+            id="sb-desc"
+            rows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g. Electronics and phone accessories sourced from Kumasi wholesalers."
+            className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-[15px] focus:border-[#d92d20] focus:outline-none"
+          />
+        </Field>
 
-        {error && (
-          <div className="mb-4 rounded bg-red-50 px-3 py-2.5 text-[12px] text-red-700 border border-red-100">{error}</div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className={labelClass}><Building2 size={10} className="inline mr-1" />Business Name</label>
-            <input type="text" required value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Bhra Joe Wholesale" className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}><Building2 size={10} className="inline mr-1" />Business Registration Number</label>
-            <input type="text" value={businessRegNumber} onChange={(e) => setBusinessRegNumber(e.target.value)} placeholder="e.g. BN123456789 (optional)" className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}><MapPin size={10} className="inline mr-1" />Region</label>
-            <input type="text" required value={region} onChange={(e) => setRegion(e.target.value)} placeholder="e.g. Greater Accra" className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}>What do you sell?</label>
-            <textarea
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g. Electronics and phone accessories sourced from Kumasi wholesalers."
-              className="w-full rounded border border-gray-200 px-3 py-2 text-[13px] focus:outline-none focus:border-[#f04438]"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full h-11 rounded bg-[#f04438] text-[13px] font-black text-white hover:bg-[#c0392b] transition-colors disabled:opacity-60"
-          >
-            {submitting ? 'Submitting…' : 'Submit Application'}
-          </button>
-        </form>
-      </div>
-    </div>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-[#d92d20] text-[15px] font-semibold text-white transition-colors hover:bg-[#b42318] disabled:opacity-60"
+        >
+          {submitting ? 'Saving…' : 'Continue'}
+          {!submitting && <ArrowRight size={16} />}
+        </button>
+      </form>
+    </OnboardingShell>
   );
 };
 
-const PendingApproval: React.FC = () => {
+/** Steps 2 and 3 for a supplier whose account is not approved yet: identity documents, then review. */
+const SupplierVerificationGate: React.FC = () => {
   const { profile } = useAuth();
-  const supplierProfile = useGlobalStore((s) => s.supplierProfile);
+  const { verification, loading, unavailable, reload } = useMyVerification('supplier');
 
-  return (
-    <div className="min-h-screen bg-[#F9FAFB] font-sans flex items-center justify-center p-6">
-      <div className="w-full max-w-md text-center">
-        <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-full bg-[#f04438]/10 text-[#f04438]">
-          <Clock3 size={26} />
-        </div>
-        <h2 className="text-[22px] font-black text-[#151515]">Application under review</h2>
-        <p className="text-[13px] text-[#888] mt-2">
-          Thanks, {profile?.fullName || 'there'}. <strong className="text-[#151515]">{supplierProfile?.businessName}</strong> is
-          being reviewed by our team. We vet every supplier before their catalog goes live to dropshippers — this
-          usually takes 1–2 business days.
-        </p>
-        <div className="mt-6 rounded border border-gray-100 bg-white p-4 text-left text-[12px] space-y-1.5">
-          <p className="flex items-center gap-2 text-[#555]"><Building2 size={13} className="text-[#f04438]" /> {supplierProfile?.businessName}</p>
-          <p className="flex items-center gap-2 text-[#555]"><MapPin size={13} className="text-[#f04438]" /> {supplierProfile?.region}</p>
-          <p className="flex items-center gap-2 text-[#555]"><Mail size={13} className="text-[#f04438]" /> {profile?.email}</p>
-        </div>
-        <Link
-          href="/marketplace"
-          className="mt-6 inline-block h-11 rounded bg-[#151515] px-6 text-[12px] font-black leading-[44px] text-white hover:bg-[#f04438] transition-colors"
-        >
-          Back to marketplace
-        </Link>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f5f5f7]">
+        <div className="h-8 w-8 rounded-full border-4 border-[#f04438] border-t-transparent animate-spin" />
       </div>
-    </div>
+    );
+  }
+  if (unavailable) {
+    return (
+      <OnboardingShell steps={STEPS} current={1} title="Verification isn't available yet">
+        <p className="text-[15px] text-[#6e6e73]">We couldn&apos;t load your verification. Please try again in a few minutes.</p>
+      </OnboardingShell>
+    );
+  }
+  if (verification?.status === 'pending' || verification?.status === 'approved') {
+    return (
+      <OnboardingShell steps={STEPS} current={2} title="Almost there">
+        <ReviewStep verification={verification} who={profile?.fullName?.split(' ')[0] || 'there'} reload={reload} onApproved={() => window.location.reload()} />
+      </OnboardingShell>
+    );
+  }
+  return (
+    <OnboardingShell
+      steps={STEPS}
+      current={1}
+      title="Verify your identity"
+      subtitle="We vet every supplier before their catalog goes live to dropshippers. Add your Ghana Card and a selfie; it takes about two minutes."
+    >
+      <IdentityStep kind="supplier" rejected={verification} onSubmitted={() => { void reload(); }} />
+    </OnboardingShell>
   );
 };
 
@@ -176,7 +164,8 @@ export default function SupplierPage() {
 
   if (profile.role === 'supplier') {
     if (!supplierProfile) return <SupplierProfileForm becomingSupplier={false} />;
-    if (!supplierProfile.isApproved) return <PendingApproval />;
+    // Whole dashboard stays closed until an admin approves their identity documents.
+    if (!supplierProfile.isApproved) return <SupplierVerificationGate />;
     return <SupplierDashboard />;
   }
 

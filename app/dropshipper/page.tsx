@@ -1,18 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth/AuthProvider';
 import { useGlobalStore } from '../../store/globalStore';
 import { DropshipperDashboard } from '../../views/DropshipperDashboard';
 import { DropshipperRegister } from '../../views/DropshipperRegister';
 import { supabase } from '../../lib/supabase/client';
-import { ArrowLeft, ArrowRight, User } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { Field, IdentityStep, OnboardingShell, ReviewStep, textInput, useMyVerification } from '../../components/onboarding/Onboarding';
 
-const inputClass =
-  'w-full h-11 rounded border border-gray-200 px-3 text-[13px] focus:outline-none focus:border-[#f04438]';
-const labelClass =
-  'block text-[10px] text-[#777] font-bold mb-1 uppercase tracking-wider';
+const STEPS = ['Your store', 'Verify identity', 'Review'];
 
 /**
  * "Set up your store" step — shown to anyone who has the dropshipper role
@@ -21,7 +18,6 @@ const labelClass =
  * (which also needs the role flipped first).
  */
 const CreateStoreForm: React.FC<{ needsRoleUpdate: boolean }> = ({ needsRoleUpdate }) => {
-  const router = useRouter();
   const { profile, refreshProfile } = useAuth();
 
   const [storeName, setStoreName] = useState('');
@@ -75,70 +71,90 @@ const CreateStoreForm: React.FC<{ needsRoleUpdate: boolean }> = ({ needsRoleUpda
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] font-sans flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        <div className="flex items-center gap-2 mb-6">
-          <button
-            type="button"
-            onClick={() => router.push('/marketplace')}
-            className="flex items-center gap-1 text-[12px] text-[#777] hover:text-[#151515]"
-          >
-            <ArrowLeft size={13} /> Back to marketplace
-          </button>
-        </div>
-
-        <h2 className="text-[24px] font-black text-[#151515]">
-          {needsRoleUpdate ? 'Become a Dropshipper' : 'Set up your store'}
-        </h2>
-        <p className="text-[13px] text-[#888] mt-1 mb-6">
-          You're signed in as {profile?.fullName || profile?.email}. Set your store name
-          to start selling. A unique store URL will be generated for you.
-        </p>
-
+    <OnboardingShell
+      steps={STEPS}
+      current={0}
+      title={needsRoleUpdate ? 'Become a dropshipper' : 'Set up your store'}
+      subtitle={`You're signed in as ${profile?.fullName || profile?.email}. Choose a store name. We'll create your store link, then verify your identity before you start selling.`}
+    >
+      <div className="space-y-5">
         {error && (
-          <div className="mb-4 rounded bg-red-50 px-3 py-2.5 text-[12px] text-red-700 border border-red-100">
-            {error}
+          <p role="alert" className="rounded-lg bg-[#fff1f0] px-3 py-2.5 text-[13px] text-[#912018]">{error}</p>
+        )}
+
+        <Field label="Store or business name" htmlFor="store-name">
+          <input
+            id="store-name"
+            type="text"
+            required
+            value={storeName}
+            onChange={(e) => setStoreName(e.target.value)}
+            placeholder={profile?.fullName || 'My Store'}
+            className={textInput}
+          />
+        </Field>
+
+        {storeName.trim() && estimatedSlug && (
+          <div className="rounded-lg bg-[#f5f5f7] p-3">
+            <p className="mb-1 text-[12px] font-medium text-[#6e6e73]">Your store link</p>
+            <p className="break-all font-mono text-[13px] text-[#1d1d1f]">
+              {window.location.origin}/store/{estimatedSlug}
+            </p>
           </div>
         )}
 
-        <div className="space-y-4">
-          <div>
-            <label className={labelClass}>
-              <User size={10} className="inline mr-1" />Store / Business Name
-            </label>
-            <input
-              type="text"
-              required
-              value={storeName}
-              onChange={(e) => setStoreName(e.target.value)}
-              placeholder={profile?.fullName || 'My Store'}
-              className={inputClass}
-            />
-          </div>
-
-          {storeName.trim() && estimatedSlug && (
-            <div className="p-3 rounded bg-[#f7f7f7] border border-gray-200">
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#999] mb-1">
-                Store URL
-              </p>
-              <p className="text-[12px] text-[#151515] font-mono break-all">
-                {window.location.origin}/store/{estimatedSlug}
-              </p>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={submitting}
-            className="w-full h-11 rounded bg-[#f04438] text-[13px] font-black text-white hover:bg-[#c0392b] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
-          >
-            {submitting ? 'Setting up store…' : 'Create My Store'}
-            {!submitting && <ArrowRight size={15} />}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleCreate}
+          disabled={submitting}
+          className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-[#d92d20] text-[15px] font-semibold text-white transition-colors hover:bg-[#b42318] disabled:opacity-60"
+        >
+          {submitting ? 'Setting up store…' : 'Continue'}
+          {!submitting && <ArrowRight size={16} />}
+        </button>
       </div>
-    </div>
+    </OnboardingShell>
+  );
+};
+
+/** Steps 2 and 3: identity documents, then waiting for an admin. The dashboard opens only once approved. */
+const DropshipperVerificationGate: React.FC = () => {
+  const { profile } = useAuth();
+  const { verification, loading, unavailable, reload } = useMyVerification('dropshipper');
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f5f5f7]">
+        <div className="h-8 w-8 rounded-full border-4 border-[#f04438] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+  if (unavailable) {
+    return (
+      <OnboardingShell steps={STEPS} current={1} title="Verification isn't available yet">
+        <p className="text-[15px] text-[#6e6e73]">We couldn&apos;t load your verification. Please try again in a few minutes.</p>
+      </OnboardingShell>
+    );
+  }
+  if (verification?.status === 'approved') return <DropshipperDashboard />;
+
+  if (verification?.status === 'pending') {
+    return (
+      <OnboardingShell steps={STEPS} current={2} title="Almost there">
+        <ReviewStep verification={verification} who={profile?.fullName?.split(' ')[0] || 'there'} reload={reload} onApproved={() => window.location.reload()} />
+      </OnboardingShell>
+    );
+  }
+
+  return (
+    <OnboardingShell
+      steps={STEPS}
+      current={1}
+      title="Verify your identity"
+      subtitle="Dropshippers handle customers' orders and money, so we confirm everyone is who they say they are. It takes about two minutes."
+    >
+      <IdentityStep kind="dropshipper" rejected={verification} onSubmitted={() => { void reload(); }} />
+    </OnboardingShell>
   );
 };
 
@@ -168,9 +184,8 @@ export default function DropshipperPage() {
     // Directly-registered dropshippers never went through store setup — send
     // them there first so they always have a working storefront URL.
     if (!dropshipperProfile) return <CreateStoreForm needsRoleUpdate={false} />;
-    return (
-      <DropshipperDashboard />
-    );
+    // Whole dashboard stays closed until an admin approves their Ghana Card + selfie.
+    return <DropshipperVerificationGate />;
   }
 
   // Signed in as a customer (or supplier) → offer to become a dropshipper.
