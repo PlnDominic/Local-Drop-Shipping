@@ -814,3 +814,75 @@
     gap: 18px;
   }
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Admin console: Apple-style sidebar layout.
+   Everything inside .apple-admin uses the system font and a calmer scale; the
+   overrides below also bring the older admin panels (which use utility classes)
+   in line without rewriting each one.
+   ─────────────────────────────────────────────────────────────────────────── */
+.apple-admin {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+}
+
+.apple-admin .admin-nav-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1d1d1f;
+  transition: background-color 120ms ease;
+}
+.apple-admin .admin-nav-item:hover { background: rgba(0, 0, 0, 0.05); }
+.apple-admin .admin-nav-item.is-active { background: rgba(0, 0, 0, 0.09); font-weight: 600; }
+
+/* display/visibility is set with utilities in AdminShell so md:hidden still wins */
+.apple-admin .admin-icon-btn {
+  height: 32px;
+  width: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #6e6e73;
+}
+.apple-admin .admin-icon-btn:hover { background: rgba(0, 0, 0, 0.06); color: #1d1d1f; }
+
+.apple-admin :focus-visible { outline: 2px solid #f04438; outline-offset: 2px; }
+
+/* Weight, radius and separators */
+.apple-admin .font-black { font-weight: 600; }
+.apple-admin .rounded { border-radius: 10px; }
+.apple-admin .rounded-lg { border-radius: 12px; }
+.apple-admin section.bg-white,
+.apple-admin .bg-white.rounded { border-color: #e5e5ea; border-radius: 14px; }
+.apple-admin .border-gray-100,
+.apple-admin .border-gray-200 { border-color: #e5e5ea; }
+.apple-admin .bg-\[\#f7f7f7\] { background-color: #f5f5f7; }
+.apple-admin thead { background-color: #f5f5f7; }
+.apple-admin input,
+.apple-admin select,
+.apple-admin textarea { border-radius: 8px; }
+
+/* Nothing below 11px, and body text a step larger */
+.apple-admin .text-\[9px\],
+.apple-admin .text-\[10px\] { font-size: 11px; }
+.apple-admin .text-\[11px\] { font-size: 12px; }
+.apple-admin .text-\[12px\] { font-size: 13px; }
+.apple-admin .text-\[13px\] { font-size: 14px; }
+
+/* Red text and filled buttons need 4.5:1 on white: #f04438 is 3.7:1, #d92d20 is 5.0:1 */
+.apple-admin .text-\[\#f04438\],
+.apple-admin .text-\[\#c0392b\] { color: #d92d20; }
+.apple-admin button.bg-\[\#f04438\],
+.apple-admin a.bg-\[\#f04438\] { background-color: #d92d20; }
+
+@media (prefers-reduced-motion: reduce) {
+  .apple-admin * { transition: none !important; animation: none !important; }
+}

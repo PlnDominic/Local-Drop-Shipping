@@ -11,6 +11,7 @@ import { SupportPanel } from '../components/admin/SupportPanel';
 import { DeliveryZonesPanel } from '../components/admin/DeliveryZonesPanel';
 import { PaymentsPanel } from '../components/admin/PaymentsPanel';
 import { NotificationsPanel } from '../components/admin/NotificationsPanel';
+import { AdminShell, type AdminNavGroup } from '../components/admin/AdminShell';
 import { getAdminCounts } from '../lib/supabase/adminCounts';
 import { useAuth } from '../lib/auth/AuthProvider';
 import {
@@ -147,22 +148,56 @@ export const AdminDashboard: React.FC = () => {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 40);
 
-  const tabs: { id: Tab; label: string; icon: typeof LayoutGrid; badge?: number }[] = [
-    { id: 'wishlist', label: 'Wishlist', icon: Heart, badge: wishlistPending },
-    { id: 'refunds', label: 'Refunds', icon: RotateCcw, badge: adminCounts.refunds },
-    { id: 'verification', label: 'Verification', icon: BadgeCheck, badge: adminCounts.verifications },
-    { id: 'support', label: 'Support', icon: LifeBuoy, badge: adminCounts.tickets },
-    { id: 'delivery', label: 'Delivery', icon: Truck },
-    { id: 'payments', label: 'Payments', icon: CreditCard },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'overview', label: 'Overview', icon: LayoutGrid },
-    { id: 'suppliers', label: 'Suppliers', icon: FileCheck, badge: pendingSuppliers.length },
-    { id: 'dropshippers', label: 'Dropshippers', icon: Store },
-    { id: 'orders', label: 'Orders', icon: FileText },
-    { id: 'revenue', label: 'Revenue', icon: TrendingUp },
-    { id: 'users', label: 'Users', icon: Users },
-    { id: 'activity', label: 'Activity', icon: Bell },
+  const item = (id: Tab, label: string, icon: typeof LayoutGrid, badge?: number) => ({ id, label, icon, badge });
+  const groups: AdminNavGroup[] = [
+    { items: [item('overview', 'Overview', LayoutGrid)] },
+    {
+      title: 'Inbox',
+      items: [
+        item('wishlist', 'Wishlist', Heart, wishlistPending),
+        item('refunds', 'Refunds', RotateCcw, adminCounts.refunds),
+        item('verification', 'Verification', BadgeCheck, adminCounts.verifications),
+        item('support', 'Support', LifeBuoy, adminCounts.tickets),
+      ],
+    },
+    {
+      title: 'Marketplace',
+      items: [
+        item('suppliers', 'Suppliers', FileCheck, pendingSuppliers.length),
+        item('dropshippers', 'Dropshippers', Store),
+        item('orders', 'Orders', FileText),
+        item('revenue', 'Revenue', TrendingUp),
+      ],
+    },
+    {
+      title: 'Platform',
+      items: [
+        item('users', 'Users', Users),
+        item('payments', 'Payments', CreditCard),
+        item('delivery', 'Delivery', Truck),
+        item('notifications', 'Notifications', Bell),
+        item('activity', 'Activity', Bell),
+      ],
+    },
   ];
+
+  const SUBTITLES: Record<Tab, string> = {
+    overview: 'Marketplace health at a glance.',
+    wishlist: 'People waiting for launch. Invite them in batches.',
+    refunds: 'Review and settle refund requests.',
+    verification: 'Check supplier documents before they go live.',
+    support: 'Customer tickets that need a reply.',
+    suppliers: 'Applications, approvals and supplier status.',
+    dropshippers: 'Storefronts on the platform.',
+    orders: 'Every order placed across the platform.',
+    revenue: 'Platform fees, realized and pending.',
+    users: 'Everyone with an account.',
+    payments: 'Online payments and the Paystack switch.',
+    delivery: 'Delivery zones and fees.',
+    notifications: 'Messages sent to customers and partners.',
+    activity: 'Recent events across the platform.',
+  };
+  const activeLabel = groups.flatMap((g) => g.items).find((i) => i.id === activeTab)?.label ?? 'Admin';
 
   const SupplierRow: React.FC<{ sp: SupplierProfile }> = ({ sp }) => (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded bg-[#f7f7f7] px-4 py-3">
@@ -198,57 +233,15 @@ export const AdminDashboard: React.FC = () => {
   );
 
   return (
-    <div className="bg-[#F9FAFB] min-h-screen font-sans animate-fade-in">
-      {/* ── Hero ── */}
-      <div className="bg-[#151515] text-white">
-        <div className="max-w-[1280px] mx-auto px-4 py-7 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[#f04438] text-[11px] font-black uppercase tracking-widest mb-1">Admin Panel</p>
-            <h1 className="text-[26px] font-black leading-tight">Platform Control Center</h1>
-            <p className="text-gray-400 text-[12px] mt-1">Supplier compliance, marketplace revenue, and platform activity.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded bg-white/5 border border-white/10 px-4 py-3">
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Platform Revenue</p>
-              <p className="text-lg font-black text-white">{formatMoney(totalPlatformRevenue)}</p>
-            </div>
-            <div className="rounded bg-white/5 border border-white/10 px-4 py-3">
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Pending Reviews</p>
-              <p className="text-lg font-black text-white">{pendingSuppliers.length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Tab pills ── */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-[1280px] mx-auto px-4 flex gap-1 overflow-x-auto py-3 scrollbar-none">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            const active = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-1.5 h-9 rounded px-4 text-[12px] font-black whitespace-nowrap transition-colors ${
-                  active ? 'bg-[#f04438] text-white' : 'bg-gray-100 text-[#555] hover:bg-gray-200'
-                }`}
-              >
-                <Icon size={14} />
-                {t.label}
-                {t.badge ? (
-                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${active ? 'bg-white/25' : 'bg-[#f04438] text-white'}`}>
-                    {t.badge}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="max-w-[1280px] mx-auto px-4 py-5 space-y-4">
+    <AdminShell
+      groups={groups}
+      active={activeTab}
+      onSelect={(id) => setActiveTab(id as Tab)}
+      title={activeLabel}
+      subtitle={SUBTITLES[activeTab]}
+      accountName={profile?.fullName || 'Administrator'}
+      accountEmail={profile?.email || ''}
+    >
 
         {/* ── WISHLIST ── kept mounted so the tab badge loads with the dashboard */}
         <div className={activeTab === 'wishlist' ? '' : 'hidden'}>
@@ -265,25 +258,19 @@ export const AdminDashboard: React.FC = () => {
         {/* ── OVERVIEW ── */}
         {activeTab === 'overview' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 { label: 'Gross Merchandise Value', value: formatMoney(totalGmv), sub: `${orders.length} order${orders.length === 1 ? '' : 's'}`, icon: TrendingUp, color: 'text-[#151515]' },
                 { label: 'Platform Revenue', value: formatMoney(totalPlatformRevenue), sub: `${formatMoney(realizedPlatformRevenue)} realized`, icon: TrendingUp, color: 'text-[#f04438]' },
                 { label: 'Registered Users', value: String(users.length), sub: `${usersByRole.dropshipper} dropshippers · ${usersByRole.supplier} suppliers`, icon: Users, color: 'text-[#151515]' },
-                { label: 'Approvals Pending', value: String(pendingSuppliers.length), sub: `${approvedSuppliers.length} suppliers approved`, icon: FileCheck, color: pendingSuppliers.length > 0 ? 'text-yellow-600' : 'text-[#151515]' },
-              ].map((kpi) => {
-                const Icon = kpi.icon;
-                return (
-                  <div key={kpi.label} className="bg-white rounded border border-gray-100 p-4 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{kpi.label}</span>
-                      <Icon size={14} className="text-gray-300" />
-                    </div>
-                    <h3 className={`text-xl font-black ${kpi.color}`}>{kpi.value}</h3>
-                    <span className="text-[10px] text-[#999]">{kpi.sub}</span>
-                  </div>
-                );
-              })}
+                { label: 'Approvals Pending', value: String(pendingSuppliers.length), sub: `${approvedSuppliers.length} suppliers approved`, icon: FileCheck, color: 'text-[#151515]' },
+              ].map((kpi) => (
+                <div key={kpi.label} className="rounded-2xl bg-[#f5f5f7] p-5">
+                  <p className="text-[13px] font-medium text-[#6e6e73]">{kpi.label}</p>
+                  <p className={`mt-1 text-[28px] font-semibold leading-tight tracking-tight ${kpi.color}`}>{kpi.value}</p>
+                  <p className="mt-1 text-[13px] text-[#6e6e73]">{kpi.sub}</p>
+                </div>
+              ))}
             </div>
 
             {pendingSuppliers.length > 0 && (
@@ -646,7 +633,6 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </section>
         )}
-      </div>
-    </div>
+    </AdminShell>
   );
 };

@@ -139,6 +139,9 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
+  // The admin console has its own sidebar chrome; the storefront header would only compete with it.
+  if (pathname?.startsWith('/admin')) return null;
+
   return (
     <>
       {/* ── Announcement Bar ── */}
