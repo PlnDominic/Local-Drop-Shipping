@@ -30,7 +30,7 @@ function LoginPageInner() {
   const { session, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
 
   // Invite links look like /login?mode=signup&role=supplier&email=...
-  const [mode, setMode] = useState<Mode>(searchParams.get('mode') === 'signup' ? 'signup' : 'signin');
+  const [mode, setMode] = useState<Mode>(searchParams.get('mode') === 'signup' ? 'signup' : searchParams.get('mode') === 'forgot' ? 'forgot' : 'signin');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState(searchParams.get('email')?.slice(0, 254) ?? '');
   const [phone, setPhone] = useState('');
@@ -47,6 +47,13 @@ function LoginPageInner() {
         : '',
   );
   const [submitting, setSubmitting] = useState(false);
+  // Reset emails are rate limited by Supabase, so stop repeat clicks for a minute after each send.
+  const [cooldown, setCooldown] = useState(0);
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   // Already signed in → leave the auth page.
   useEffect(() => {
@@ -66,7 +73,8 @@ function LoginPageInner() {
       setSubmitting(false);
       if (err) return setError(err);
       // Same message whether or not the email has an account, so it can't be probed.
-      setInfo("If an account exists for that email, we've sent a link to reset your password. Check your inbox and spam folder.");
+      setInfo("If an account exists for that email, we've sent a link to reset your password. It can take a minute; check your spam folder too. The link works once and expires after an hour.");
+      setCooldown(60);
       return;
     }
 
@@ -256,11 +264,15 @@ function LoginPageInner() {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || (mode === 'forgot' && cooldown > 0)}
               className="w-full h-11 rounded bg-[#151515] text-[13px] font-black text-white hover:bg-[#f04438] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
             >
-              {submitting ? 'Please wait…' : mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send reset link'}
-              {!submitting && <ArrowRight size={15} />}
+              {submitting
+                ? 'Please wait…'
+                : mode === 'signin' ? 'Sign In'
+                : mode === 'signup' ? 'Create Account'
+                : cooldown > 0 ? `Send again in ${cooldown}s` : 'Send reset link'}
+              {!submitting && !(mode === 'forgot' && cooldown > 0) && <ArrowRight size={15} />}
             </button>
           </form>
 

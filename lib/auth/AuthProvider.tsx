@@ -26,8 +26,26 @@ interface AuthContextValue {
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   /** Sets a new password for the current (recovery) session. */
   updatePassword: (password: string) => Promise<{ error: string | null }>;
-  signOut: () => Promise<void>;
+  /** Exchanges the one-time token from the reset email for a recovery session (on button press, not page load). */
+  verifyRecovery: (tokenHash: string) => Promise<{ error: string | null }>;
+  /** `everywhere` also ends sessions on other devices; used after a password reset. */
+  signOut: (opts?: { everywhere?: boolean }) => Promise<void>;
   refreshProfile: () => Promise<void>;
+}
+
+/** Turns Supabase's terse auth errors into something a person can act on. */
+function friendlyAuthError(message: string, status?: number): string {
+  const m = message.toLowerCase();
+  if (status === 429 || m.includes('rate limit') || m.includes('security purposes')) {
+    return 'Too many requests. Please wait a minute and try again.';
+  }
+  if (m.includes('same password') || m.includes('different from the old')) {
+    return 'Choose a password you have not used before.';
+  }
+  if (m.includes('weak') || m.includes('at least')) {
+    return 'That password is too weak. Use at least 8 characters with a mix of letters and numbers.';
+  }
+  return message;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -106,16 +124,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Must be in the Supabase "Redirect URLs" allow list.
       redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined,
     });
-    return { error: error?.message ?? null };
+    return { error: error ? friendlyAuthError(error.message, error.status) : null };
+  };
+
+  const verifyRecovery: AuthContextValue['verifyRecovery'] = async (tokenHash) => {
+    const { error } = await supabase.auth.verifyOtp({ type: 'recovery', token_hash: tokenHash });
+    return { error: error ? 'This reset link has expired or was already used. Request a new one.' : null };
   };
 
   const updatePassword: AuthContextValue['updatePassword'] = async (password) => {
     const { error } = await supabase.auth.updateUser({ password });
-    return { error: error?.message ?? null };
+    return { error: error ? friendlyAuthError(error.message, error.status) : null };
   };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
+  const signOut = async (opts?: { everywhere?: boolean }) => {
+    await supabase.auth.signOut(opts?.everywhere ? { scope: 'global' } : undefined);
     setProfile(null);
   };
 
@@ -124,7 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signInWithGoogle, resetPassword, updatePassword, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signInWithGoogle, resetPassword, updatePassword, verifyRecovery, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
