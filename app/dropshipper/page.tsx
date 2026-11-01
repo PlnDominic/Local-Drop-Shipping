@@ -6,7 +6,6 @@ import { useAuth } from '../../lib/auth/AuthProvider';
 import { useGlobalStore } from '../../store/globalStore';
 import { DropshipperDashboard } from '../../views/DropshipperDashboard';
 import { DropshipperRegister } from '../../views/DropshipperRegister';
-import { SiteHeader } from '../../components/SiteHeader';
 import { supabase } from '../../lib/supabase/client';
 import { ArrowLeft, ArrowRight, User } from 'lucide-react';
 
@@ -161,10 +160,7 @@ export default function DropshipperPage() {
 
   if (profile.role === 'admin') {
     return (
-      <>
-        <SiteHeader />
-        <DropshipperDashboard />
-      </>
+      <DropshipperDashboard />
     );
   }
 
@@ -173,10 +169,7 @@ export default function DropshipperPage() {
     // them there first so they always have a working storefront URL.
     if (!dropshipperProfile) return <CreateStoreForm needsRoleUpdate={false} />;
     return (
-      <>
-        <SiteHeader />
-        <DropshipperDashboard />
-      </>
+      <DropshipperDashboard />
     );
   }
 

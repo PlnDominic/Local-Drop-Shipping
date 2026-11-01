@@ -7,6 +7,7 @@ import { useGlobalStore } from '../store/globalStore';
 import type { Product } from '../store/globalStore';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../lib/auth/AuthProvider';
+import { SidebarShell, type NavGroup } from '../components/shell/SidebarShell';
 import {
   LayoutGrid,
   PlusCircle,
@@ -244,68 +245,52 @@ export const DropshipperDashboard: React.FC = () => {
     }
   };
 
-  const tabs: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
-    { id: 'overview', label: 'Overview', icon: LayoutGrid },
-    { id: 'import', label: 'Import Products', icon: PlusCircle },
-    { id: 'my-store', label: 'My Store', icon: ShoppingBag },
-    { id: 'share', label: 'Share & Track', icon: Share2 },
-    { id: 'customize', label: 'Customize Store', icon: Palette },
-    { id: 'orders', label: 'Orders', icon: FileText },
-    { id: 'wallet', label: 'Wallet', icon: Wallet },
+  const item = (id: Tab, label: string, icon: typeof LayoutGrid, badge?: number) => ({ id, label, icon, badge });
+  const groups: NavGroup[] = [
+    { items: [item('overview', 'Overview', LayoutGrid)] },
+    {
+      title: 'Store',
+      items: [
+        item('import', 'Import Products', PlusCircle, availableToImport.length),
+        item('my-store', 'My Store', ShoppingBag),
+        item('customize', 'Customize Store', Palette),
+      ],
+    },
+    { title: 'Grow', items: [item('share', 'Share & Track', Share2)] },
+    { title: 'Money', items: [item('orders', 'Orders', FileText), item('wallet', 'Wallet', Wallet)] },
   ];
+  const SUBTITLES: Record<Tab, string> = {
+    overview: `${storeName}. Import products, set your markup, and earn on every sale.`,
+    import: 'Pick products from verified suppliers to sell in your store.',
+    'my-store': 'Set your prices and choose what customers can see.',
+    share: 'Share your store link and see where sales come from.',
+    customize: 'Change how your storefront looks.',
+    orders: 'Orders placed in your store.',
+    wallet: 'Your earnings and withdrawals.',
+  };
+  const activeLabel = groups.flatMap((g) => g.items).find((i) => i.id === activeTab)?.label ?? 'Dropshipper';
 
   return (
-    <div className="bg-[#F9FAFB] min-h-screen font-sans animate-fade-in">
-      {/* ── Hero strip ── */}
-      <div className="bg-[#151515] text-white">
-        <div className="max-w-[1280px] mx-auto px-4 py-7 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[#f04438] text-[11px] font-black uppercase tracking-widest mb-1">Dropshipper Hub</p>
-            <h1 className="text-[26px] font-black leading-tight">{storeName}</h1>
-            <p className="text-gray-400 text-[12px] mt-1">Import products, set your markup, and earn on every sale.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded bg-white/5 border border-white/10 px-4 py-3">
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Balance</p>
-              <p className="text-lg font-black text-white">{formatMoney(wallet.balance)}</p>
-            </div>
-            <div className="rounded bg-white/5 border border-white/10 px-4 py-3">
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Orders</p>
-              <p className="text-lg font-black text-white">{totalOrders}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Tab pills ── */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-[1280px] mx-auto px-4 flex gap-1 overflow-x-auto py-3 scrollbar-none">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            const active = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-1.5 h-9 rounded px-4 text-[12px] font-black whitespace-nowrap transition-colors ${
-                  active ? 'bg-[#f04438] text-white' : 'bg-gray-100 text-[#555] hover:bg-gray-200'
-                }`}
-              >
-                <Icon size={14} />
-                {t.label}
-                {t.id === 'import' && availableToImport.length > 0 && (
-                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${active ? 'bg-white/25' : 'bg-[#f04438] text-white'}`}>
-                    {availableToImport.length}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="max-w-[1280px] mx-auto px-4 py-5 space-y-4">
+    <SidebarShell
+      groups={groups}
+      active={activeTab}
+      onSelect={(id) => setActiveTab(id as Tab)}
+      title={activeLabel}
+      subtitle={SUBTITLES[activeTab]}
+      accountName={profile?.fullName || storeName}
+      accountEmail={profile?.email || ''}
+      moduleLabel="Dropshipper"
+      toolbar={
+        <>
+          <span className="hidden text-[#6e6e73] sm:inline">Balance <strong className="font-semibold text-[#1d1d1f]">{formatMoney(wallet.balance)}</strong></span>
+          {storefrontUrl && (
+            <a href={storefrontUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-[#d92d20] hover:underline">
+              View store <ExternalLink size={13} />
+            </a>
+          )}
+        </>
+      }
+    >
 
         {/* ── OVERVIEW ── */}
         {activeTab === 'overview' && (
@@ -1058,7 +1043,6 @@ export const DropshipperDashboard: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
 
       {/* ── Import setup modal ── */}
       {selectedProduct && (
@@ -1130,6 +1114,6 @@ export const DropshipperDashboard: React.FC = () => {
           </form>
         </div>
       )}
-    </div>
+    </SidebarShell>
   );
 };

@@ -11,7 +11,7 @@ import { SupportPanel } from '../components/admin/SupportPanel';
 import { DeliveryZonesPanel } from '../components/admin/DeliveryZonesPanel';
 import { PaymentsPanel } from '../components/admin/PaymentsPanel';
 import { NotificationsPanel } from '../components/admin/NotificationsPanel';
-import { AdminShell, type AdminNavGroup } from '../components/admin/AdminShell';
+import { SidebarShell, type NavGroup } from '../components/shell/SidebarShell';
 import { getAdminCounts } from '../lib/supabase/adminCounts';
 import { useAuth } from '../lib/auth/AuthProvider';
 import {
@@ -149,7 +149,7 @@ export const AdminDashboard: React.FC = () => {
     .slice(0, 40);
 
   const item = (id: Tab, label: string, icon: typeof LayoutGrid, badge?: number) => ({ id, label, icon, badge });
-  const groups: AdminNavGroup[] = [
+  const groups: NavGroup[] = [
     { items: [item('overview', 'Overview', LayoutGrid)] },
     {
       title: 'Inbox',
@@ -233,7 +233,7 @@ export const AdminDashboard: React.FC = () => {
   );
 
   return (
-    <AdminShell
+    <SidebarShell
       groups={groups}
       active={activeTab}
       onSelect={(id) => setActiveTab(id as Tab)}
@@ -241,6 +241,7 @@ export const AdminDashboard: React.FC = () => {
       subtitle={SUBTITLES[activeTab]}
       accountName={profile?.fullName || 'Administrator'}
       accountEmail={profile?.email || ''}
+      moduleLabel="Admin"
     >
 
         {/* ── WISHLIST ── kept mounted so the tab badge loads with the dashboard */}
@@ -633,6 +634,6 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </section>
         )}
-    </AdminShell>
+    </SidebarShell>
   );
 };

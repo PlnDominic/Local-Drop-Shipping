@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useGlobalStore } from '../store/globalStore';
 import type { ProductVariant } from '../store/globalStore';
 import { useAuth } from '../lib/auth/AuthProvider';
+import { SidebarShell, type NavGroup } from '../components/shell/SidebarShell';
 import {
   Package,
   Plus,
@@ -276,84 +277,53 @@ export const SupplierDashboard: React.FC = () => {
     if (count > 0) setActiveTab('products');
   };
 
-  const tabs: { id: Tab; label: string; icon: typeof Package; badge?: number }[] = [
-    { id: 'products', label: 'Products', icon: Package },
-    { id: 'upload', label: 'Upload Item', icon: Plus },
-    { id: 'bulk', label: 'Bulk Import', icon: UploadCloud },
-    { id: 'orders', label: 'Fulfillment', icon: Truck, badge: pendingCount },
-    { id: 'verification', label: 'Verification', icon: BadgeCheck },
+  const item = (id: Tab, label: string, icon: typeof Package, badge?: number) => ({ id, label, icon, badge });
+  const groups: NavGroup[] = [
+    {
+      title: 'Catalog',
+      items: [item('products', 'Products', Package), item('upload', 'Upload Item', Plus), item('bulk', 'Bulk Import', UploadCloud)],
+    },
+    {
+      title: 'Business',
+      items: [item('orders', 'Fulfillment', Truck, pendingCount), item('verification', 'Verification', BadgeCheck)],
+    },
   ];
+  const SUBTITLES: Record<Tab, string> = {
+    products: 'Your wholesale catalog and stock levels.',
+    upload: 'Add a single product for dropshippers to resell.',
+    bulk: 'Add many products at once from a spreadsheet.',
+    orders: 'Orders from dropshippers waiting for you to ship.',
+    verification: 'Documents that get your business verified.',
+  };
+  const activeLabel = groups.flatMap((g) => g.items).find((i) => i.id === activeTab)?.label ?? 'Supplier';
 
   const inputClass =
     'w-full h-10 rounded border border-gray-200 px-3 text-[12px] focus:outline-none focus:border-[#f04438]';
   const labelClass = 'block text-[10px] text-[#777] font-bold mb-1 uppercase tracking-wider';
 
   return (
-    <div className="bg-[#F9FAFB] min-h-screen font-sans animate-fade-in">
-      {/* ── Hero ── */}
-      <div className="bg-[#151515] text-white">
-        <div className="max-w-[1280px] mx-auto px-4 py-7 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[#f04438] text-[11px] font-black uppercase tracking-widest mb-1 flex items-center gap-2">
-              Supplier Portal
-              {supplierProfile?.isApproved && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] text-emerald-400">
-                  <CheckCircle2 size={10} /> Approved
-                </span>
-              )}
-              {supplierProfile?.isVerified && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[9px] text-blue-300">
-                  <BadgeCheck size={10} /> Verified
-                </span>
-              )}
-            </p>
-            <h1 className="text-[26px] font-black leading-tight">{businessName}</h1>
-            <p className="text-gray-400 text-[12px] mt-1">
-              {supplierProfile?.region ? `${supplierProfile.region} · ` : ''}List wholesale items and fulfill dropshipper orders.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded bg-white/5 border border-white/10 px-4 py-3">
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Escrow</p>
-              <p className="text-lg font-black text-white">{formatMoney(wallet.balance)}</p>
-            </div>
-            <div className="rounded bg-white/5 border border-white/10 px-4 py-3">
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">To Fulfill</p>
-              <p className="text-lg font-black text-white">{pendingCount}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <SidebarShell
+      groups={groups}
+      active={activeTab}
+      onSelect={(id) => setActiveTab(id as Tab)}
+      title={activeLabel}
+      subtitle={`${businessName}${supplierProfile?.region ? ` · ${supplierProfile.region}` : ''}. ${SUBTITLES[activeTab]}`}
+      accountName={businessName}
+      accountEmail={profile?.email || ''}
+      moduleLabel="Supplier"
+      toolbar={
+        <>
+          {supplierProfile?.isApproved && (
+            <span className="hidden items-center gap-1 text-[#6e6e73] sm:inline-flex"><CheckCircle2 size={13} /> Approved</span>
+          )}
+          {supplierProfile?.isVerified && (
+            <span className="hidden items-center gap-1 text-[#6e6e73] sm:inline-flex"><BadgeCheck size={13} /> Verified</span>
+          )}
+          <span className="text-[#6e6e73]">Escrow <strong className="font-semibold text-[#1d1d1f]">{formatMoney(wallet.balance)}</strong></span>
+        </>
+      }
+    >
 
-      {/* ── Tab pills ── */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-[1280px] mx-auto px-4 flex gap-1 overflow-x-auto py-3 scrollbar-none">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            const active = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-1.5 h-9 rounded px-4 text-[12px] font-black whitespace-nowrap transition-colors ${
-                  active ? 'bg-[#f04438] text-white' : 'bg-gray-100 text-[#555] hover:bg-gray-200'
-                }`}
-              >
-                <Icon size={14} />
-                {t.label}
-                {t.badge ? (
-                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${active ? 'bg-white/25' : 'bg-[#f04438] text-white'}`}>
-                    {t.badge}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="max-w-[1280px] mx-auto px-4 py-5 space-y-4">
 
         {activeTab === 'verification' && <VerificationCard />}
 
@@ -900,7 +870,6 @@ export const SupplierDashboard: React.FC = () => {
             )}
           </div>
         )}
-      </div>
-    </div>
+    </SidebarShell>
   );
 };

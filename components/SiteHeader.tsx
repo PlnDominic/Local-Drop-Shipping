@@ -139,8 +139,10 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  // The admin console has its own sidebar chrome; the storefront header would only compete with it.
-  if (pathname?.startsWith('/admin')) return null;
+  // The admin, dropshipper and supplier consoles have their own sidebar chrome; the storefront header
+  // would only compete with it. Signed-out visitors still see it on the sign-up pages.
+  const inConsole = !!profile && ['/admin', '/dropshipper', '/supplier'].some((p) => pathname === p || pathname?.startsWith(`${p}/`));
+  if (inConsole) return null;
 
   return (
     <>

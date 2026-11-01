@@ -4,35 +4,42 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Menu, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 
-export interface AdminNavItem {
+export interface NavItem {
   id: string;
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   badge?: number;
 }
 
-export interface AdminNavGroup {
+export interface NavGroup {
   /** Omit for the ungrouped items at the top of the sidebar. */
   title?: string;
-  items: AdminNavItem[];
+  items: NavItem[];
 }
 
-interface AdminShellProps {
-  groups: AdminNavGroup[];
+interface SidebarShellProps {
+  groups: NavGroup[];
   active: string;
   onSelect: (id: string) => void;
   title: string;
   subtitle?: string;
   accountName: string;
   accountEmail: string;
+  /** Names the module under the brand, e.g. "Admin", "Dropshipper", "Supplier". */
+  moduleLabel: string;
+  backHref?: string;
+  backLabel?: string;
+  /** Right side of the top toolbar: balances, status chips, a link to the live store. */
+  toolbar?: React.ReactNode;
   children: React.ReactNode;
 }
 
 /**
- * macOS-style source-list sidebar plus a content pane with a large title.
+ * macOS-style source-list sidebar plus a content pane with a large title. Shared by the admin,
+ * dropshipper and supplier consoles (styles live under .apple-admin in globals.css).
  * Sidebar can be hidden (persisted), and becomes a slide-over drawer on narrow screens.
  */
-export const AdminShell: React.FC<AdminShellProps> = ({
+export const SidebarShell: React.FC<SidebarShellProps> = ({
   groups,
   active,
   onSelect,
@@ -40,6 +47,10 @@ export const AdminShell: React.FC<AdminShellProps> = ({
   subtitle,
   accountName,
   accountEmail,
+  moduleLabel,
+  backHref = '/marketplace',
+  backLabel = 'Back to marketplace',
+  toolbar,
   children,
 }) => {
   const [hidden, setHidden] = useState(false);
@@ -47,7 +58,7 @@ export const AdminShell: React.FC<AdminShellProps> = ({
 
   useEffect(() => {
     try {
-      setHidden(localStorage.getItem('admin-sidebar-hidden') === '1');
+      setHidden(localStorage.getItem('app-sidebar-hidden') === '1');
     } catch {
       /* storage unavailable: keep default */
     }
@@ -55,7 +66,7 @@ export const AdminShell: React.FC<AdminShellProps> = ({
 
   const toggleHidden = () => {
     setHidden((h) => {
-      try { localStorage.setItem('admin-sidebar-hidden', h ? '0' : '1'); } catch { /* ignore */ }
+      try { localStorage.setItem('app-sidebar-hidden', h ? '0' : '1'); } catch { /* ignore */ }
       return !h;
     });
   };
@@ -66,13 +77,13 @@ export const AdminShell: React.FC<AdminShellProps> = ({
   };
 
   const sidebar = (
-    <nav aria-label="Admin sections" className="flex h-full flex-col">
+    <nav aria-label={`${moduleLabel} sections`} className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 pb-3 pt-5">
         <div className="min-w-0">
           <p className="truncate text-[15px] font-semibold tracking-tight text-[#1d1d1f]">
             Localdropshipping<span className="text-[#f04438]">gh</span>
           </p>
-          <p className="text-[12px] text-[#6e6e73]">Admin</p>
+          <p className="text-[12px] text-[#6e6e73]">{moduleLabel}</p>
         </div>
         <button
           type="button"
@@ -121,8 +132,8 @@ export const AdminShell: React.FC<AdminShellProps> = ({
       <div className="border-t border-[#e5e5ea] px-4 py-3">
         <p className="truncate text-[13px] font-medium text-[#1d1d1f]">{accountName}</p>
         <p className="truncate text-[12px] text-[#6e6e73]">{accountEmail}</p>
-        <Link href="/marketplace" className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#d92d20] hover:underline">
-          <ArrowLeft size={14} /> Back to marketplace
+        <Link href={backHref} className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#d92d20] hover:underline">
+          <ArrowLeft size={14} /> {backLabel}
         </Link>
       </div>
     </nav>
@@ -139,7 +150,7 @@ export const AdminShell: React.FC<AdminShellProps> = ({
 
       {/* Mobile drawer */}
       {drawer && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Admin menu">
+        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label={`${moduleLabel} menu`}>
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} />
           <aside className="absolute inset-y-0 left-0 w-[284px] max-w-[85vw] bg-[#f5f5f7] shadow-2xl">{sidebar}</aside>
         </div>
@@ -160,7 +171,8 @@ export const AdminShell: React.FC<AdminShellProps> = ({
           >
             {hidden ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
-          <span className="truncate text-[13px] font-semibold text-[#1d1d1f]">{title}</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#1d1d1f]">{title}</span>
+          {toolbar && <div className="flex shrink-0 items-center gap-3 text-[13px]">{toolbar}</div>}
         </div>
 
         <main className="mx-auto max-w-[1100px] px-5 pb-16 pt-8 sm:px-8">
